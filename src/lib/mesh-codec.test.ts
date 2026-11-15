@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { MeshCodec, PROXY_TYPE_BEACON, PROXY_TYPE_NETWORK, decodeOpcode, encodeOpcode } from './mesh-codec';
 import { cmac, s1 } from './mesh-crypto';
 import { parseMeshExport } from './mesh-export';
-import { buildExport } from './test-export.test-helper';
+import { buildExport } from './test-export.fixture.test';
 
 function pair(): { a: MeshCodec; b: MeshCodec; seqA: () => number } {
     const exp = parseMeshExport(buildExport().text);

@@ -17,7 +17,7 @@ import {
     validateSetpoint,
 } from './thermostat';
 import type { ThermostatInfo } from './mesh-export';
-import { TEST_MAC } from './test-export.test-helper';
+import { TEST_MAC } from './test-export.fixture.test';
 
 const T: ThermostatInfo = {
     address: 6,

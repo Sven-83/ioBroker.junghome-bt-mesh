@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { checkOwnAddress, parseMeshExport } from './mesh-export';
-import { TEST_MAC, buildExport } from './test-export.test-helper';
+import { TEST_MAC, buildExport } from './test-export.fixture.test';
 
 describe('mesh-export', () => {
     it('finds the thermostat with its elements, MAC and name', () => {
