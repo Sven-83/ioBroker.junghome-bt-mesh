@@ -1,0 +1,143 @@
+{
+    "i18n": true,
+    "type": "panel",
+    "items": {
+        "meshHeader": {
+            "type": "header",
+            "text": "Mesh",
+            "size": 3,
+            "xs": 12,
+            "sm": 12,
+            "md": 12,
+            "lg": 12,
+            "xl": 12
+        },
+        "meshExport": {
+            "type": "text",
+            "label": "JUNG HOME project export",
+            "help": "mesh_export_help",
+            "minRows": 3,
+            "maxRows": 6,
+            "newLine": true,
+            "xs": 12,
+            "sm": 12,
+            "md": 12,
+            "lg": 8,
+            "xl": 8
+        },
+        "ownAddress": {
+            "type": "text",
+            "label": "Own mesh address",
+            "help": "own_address_help",
+            "validator": "/^[0-9a-fA-F]{4}$/.test(data.ownAddress)",
+            "validatorErrorText": "own_address_error",
+            "validatorNoSaveOnError": true,
+            "newLine": true,
+            "xs": 12,
+            "sm": 6,
+            "md": 4,
+            "lg": 2,
+            "xl": 2
+        },
+        "proxyHeader": {
+            "type": "header",
+            "text": "ESPHome Bluetooth proxies",
+            "size": 3,
+            "newLine": true,
+            "xs": 12,
+            "sm": 12,
+            "md": 12,
+            "lg": 12,
+            "xl": 12
+        },
+        "proxy1Host": {
+            "type": "text",
+            "label": "Proxy 1 (preferred)",
+            "help": "proxy_host_help",
+            "newLine": true,
+            "xs": 12,
+            "sm": 6,
+            "md": 4,
+            "lg": 3,
+            "xl": 3
+        },
+        "proxy1Key": {
+            "type": "password",
+            "label": "API encryption key",
+            "help": "proxy_key_help",
+            "xs": 12,
+            "sm": 6,
+            "md": 6,
+            "lg": 5,
+            "xl": 5
+        },
+        "proxy2Host": {
+            "type": "text",
+            "label": "Proxy 2 (fallback, optional)",
+            "help": "proxy_host_help",
+            "newLine": true,
+            "xs": 12,
+            "sm": 6,
+            "md": 4,
+            "lg": 3,
+            "xl": 3
+        },
+        "proxy2Key": {
+            "type": "password",
+            "label": "API encryption key",
+            "help": "proxy_key_help",
+            "xs": 12,
+            "sm": 6,
+            "md": 6,
+            "lg": 5,
+            "xl": 5
+        },
+        "behaviourHeader": {
+            "type": "header",
+            "text": "Behaviour",
+            "size": 3,
+            "newLine": true,
+            "xs": 12,
+            "sm": 12,
+            "md": 12,
+            "lg": 12,
+            "xl": 12
+        },
+        "pollMinutes": {
+            "type": "number",
+            "label": "Poll interval (minutes)",
+            "help": "poll_help",
+            "min": 1,
+            "max": 60,
+            "newLine": true,
+            "xs": 12,
+            "sm": 4,
+            "md": 3,
+            "lg": 2,
+            "xl": 2
+        },
+        "boostMinutes": {
+            "type": "number",
+            "label": "Boost duration (minutes)",
+            "min": 5,
+            "max": 240,
+            "xs": 12,
+            "sm": 4,
+            "md": 3,
+            "lg": 2,
+            "xl": 2
+        },
+        "boostSetpoint": {
+            "type": "number",
+            "label": "Boost setpoint (°C)",
+            "min": 5,
+            "max": 30,
+            "step": 0.5,
+            "xs": 12,
+            "sm": 4,
+            "md": 3,
+            "lg": 2,
+            "xl": 2
+        }
+    }
+}

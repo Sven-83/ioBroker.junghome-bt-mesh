@@ -1,0 +1,132 @@
+{
+    "common": {
+        "name": "junghome-bt-mesh",
+        "version": "0.0.1",
+        "news": {
+            "0.0.1": {
+                "en": "initial release",
+                "de": "Erstveröffentlichung",
+                "ru": "Начальная версия",
+                "pt": "lançamento inicial",
+                "nl": "Eerste uitgave",
+                "fr": "Première version",
+                "it": "Versione iniziale",
+                "es": "Versión inicial",
+                "pl": "Pierwsze wydanie",
+                "uk": "Початкова версія",
+                "zh-cn": "首次出版"
+            }
+        },
+        "titleLang": {
+            "en": "JUNG HOME thermostats (Bluetooth Mesh)",
+            "de": "JUNG-HOME-Thermostate (Bluetooth Mesh)",
+            "ru": "Термостаты JUNG HOME (Bluetooth Mesh)",
+            "pt": "Termostatos JUNG HOME (Bluetooth Mesh)",
+            "nl": "JUNG HOME-thermostaten (Bluetooth Mesh)",
+            "fr": "Thermostats JUNG HOME (Bluetooth Mesh)",
+            "it": "Termostati JUNG HOME (Bluetooth Mesh)",
+            "es": "Termostatos JUNG HOME (Bluetooth Mesh)",
+            "pl": "Termostaty JUNG HOME (Bluetooth Mesh)",
+            "uk": "Термостати JUNG HOME (Bluetooth Mesh)",
+            "zh-cn": "JUNG HOME 恒温器（蓝牙 Mesh）"
+        },
+        "desc": {
+            "en": "JUNG HOME room thermostats over Bluetooth Mesh through ESPHome Bluetooth proxies",
+            "de": "JUNG-HOME-Raumthermostate per Bluetooth Mesh über ESPHome-Bluetooth-Proxys",
+            "ru": "Комнатные термостаты JUNG HOME через Bluetooth Mesh и прокси ESPHome Bluetooth",
+            "pt": "Termostatos ambiente JUNG HOME via Bluetooth Mesh através de proxies Bluetooth ESPHome",
+            "nl": "JUNG HOME-kamerthermostaten via Bluetooth Mesh met ESPHome Bluetooth-proxy's",
+            "fr": "Thermostats d'ambiance JUNG HOME via Bluetooth Mesh avec des proxys Bluetooth ESPHome",
+            "it": "Termostati ambiente JUNG HOME tramite Bluetooth Mesh con proxy Bluetooth ESPHome",
+            "es": "Termostatos de ambiente JUNG HOME por Bluetooth Mesh mediante proxies Bluetooth ESPHome",
+            "pl": "Termostaty pokojowe JUNG HOME przez Bluetooth Mesh z proxy Bluetooth ESPHome",
+            "uk": "Кімнатні термостати JUNG HOME через Bluetooth Mesh і проксі ESPHome Bluetooth",
+            "zh-cn": "通过 ESPHome 蓝牙代理以蓝牙 Mesh 连接 JUNG HOME 室内恒温器"
+        },
+        "authors": [
+            "Sven-83 <276080681+Sven-83@users.noreply.github.com>"
+        ],
+        "keywords": [
+            "jung",
+            "junghome",
+            "bluetooth mesh",
+            "thermostat",
+            "esphome",
+            "underfloor heating"
+        ],
+        "licenseInformation": {
+            "type": "free",
+            "license": "MIT"
+        },
+        "platform": "Javascript/Node.js",
+        "icon": "junghome-bt-mesh.png",
+        "enabled": true,
+        "extIcon": "https://raw.githubusercontent.com/Sven-83/ioBroker.junghome-bt-mesh/main/admin/junghome-bt-mesh.png",
+        "readme": "https://github.com/Sven-83/ioBroker.junghome-bt-mesh/blob/main/README.md",
+        "loglevel": "info",
+        "tier": 3,
+        "mode": "daemon",
+        "type": "climate-control",
+        "compact": true,
+        "connectionType": "local",
+        "dataSource": "push",
+        "adminUI": {
+            "config": "json"
+        },
+        "dependencies": [
+            {
+                "js-controller": ">=6.0.11"
+            }
+        ],
+        "globalDependencies": [
+            {
+                "admin": ">=7.6.20"
+            }
+        ]
+    },
+    "native": {
+        "meshExport": "",
+        "ownAddress": "0D01",
+        "proxy1Host": "",
+        "proxy1Key": "",
+        "proxy2Host": "",
+        "proxy2Key": "",
+        "pollMinutes": 5,
+        "boostMinutes": 60,
+        "boostSetpoint": 30
+    },
+    "encryptedNative": [
+        "meshExport",
+        "proxy1Key",
+        "proxy2Key"
+    ],
+    "protectedNative": [
+        "meshExport",
+        "proxy1Key",
+        "proxy2Key"
+    ],
+    "objects": [],
+    "instanceObjects": [
+        {
+            "_id": "info",
+            "type": "channel",
+            "common": {
+                "name": "Information"
+            },
+            "native": {}
+        },
+        {
+            "_id": "info.connection",
+            "type": "state",
+            "common": {
+                "role": "indicator.connected",
+                "name": "Connected to the mesh",
+                "type": "boolean",
+                "read": true,
+                "write": false,
+                "def": false
+            },
+            "native": {}
+        }
+    ]
+}

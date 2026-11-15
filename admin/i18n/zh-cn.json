@@ -1,0 +1,19 @@
+{
+    "Mesh": "Mesh",
+    "JUNG HOME project export": "JUNG HOME 项目导出",
+    "mesh_export_help": "粘贴 JungHome.json 的完整内容（JUNG HOME 应用：项目 → 项目移交）。其中包含所有 Mesh 密钥，并以加密方式保存。",
+    "Own mesh address": "本机 Mesh 地址",
+    "own_address_help": "本适配器的单播地址，4 位十六进制，须在 JUNG HOME 应用的范围之外（例如 0D01）。切勿在两个实例中使用同一地址。",
+    "own_address_error": "请输入正好 4 位十六进制数字",
+    "ESPHome Bluetooth proxies": "ESPHome 蓝牙代理",
+    "Proxy 1 (preferred)": "代理 1（首选）",
+    "proxy_host_help": "支持主动连接的 ESPHome 蓝牙代理的主机名或 IP 地址",
+    "API encryption key": "API 加密密钥",
+    "proxy_key_help": "代理 api: encryption: key 中的 Base64 密钥；代理未加密时留空",
+    "Proxy 2 (fallback, optional)": "代理 2（备用，可选）",
+    "Behaviour": "行为",
+    "Poll interval (minutes)": "轮询间隔（分钟）",
+    "poll_help": "恒温器会自行报告设定值变化；轮询还会读取室温",
+    "Boost duration (minutes)": "增强时长（分钟）",
+    "Boost setpoint (°C)": "增强设定值（°C）"
+}

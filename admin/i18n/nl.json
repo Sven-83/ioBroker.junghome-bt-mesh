@@ -1,0 +1,19 @@
+{
+    "Mesh": "Mesh",
+    "JUNG HOME project export": "JUNG HOME-projectexport",
+    "mesh_export_help": "Plak de volledige inhoud van JungHome.json (JUNG HOME-app: Project → Projectoverdracht). Bevat alle mesh-sleutels en wordt versleuteld opgeslagen.",
+    "Own mesh address": "Eigen mesh-adres",
+    "own_address_help": "Unicast-adres van deze adapter als 4 hexcijfers, buiten het bereik van de JUNG HOME-app (bijv. 0D01). Gebruik nooit hetzelfde adres in twee instanties.",
+    "own_address_error": "Voer precies 4 hexcijfers in",
+    "ESPHome Bluetooth proxies": "ESPHome Bluetooth-proxy's",
+    "Proxy 1 (preferred)": "Proxy 1 (voorkeur)",
+    "proxy_host_help": "Hostnaam of IP-adres van een ESPHome Bluetooth-proxy met actieve verbindingen",
+    "API encryption key": "API-versleutelingssleutel",
+    "proxy_key_help": "Base64-sleutel uit api: encryption: key van de proxy, leeg als de proxy geen versleuteling heeft",
+    "Proxy 2 (fallback, optional)": "Proxy 2 (reserve, optioneel)",
+    "Behaviour": "Gedrag",
+    "Poll interval (minutes)": "Opvraaginterval (minuten)",
+    "poll_help": "De thermostaat meldt wijzigingen van het setpoint zelf; opvragen haalt ook de kamertemperatuur op",
+    "Boost duration (minutes)": "Boostduur (minuten)",
+    "Boost setpoint (°C)": "Boost-setpoint (°C)"
+}

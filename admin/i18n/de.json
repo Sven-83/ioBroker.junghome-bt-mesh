@@ -1,0 +1,19 @@
+{
+    "Mesh": "Mesh",
+    "JUNG HOME project export": "JUNG-HOME-Projektexport",
+    "mesh_export_help": "Den vollständigen Inhalt von JungHome.json einfügen (JUNG-HOME-App: Projekt → Projektübergabe). Er enthält alle Mesh-Schlüssel und wird verschlüsselt gespeichert.",
+    "Own mesh address": "Eigene Mesh-Adresse",
+    "own_address_help": "Unicast-Adresse dieses Adapters als 4 Hex-Ziffern, außerhalb des Bereichs der JUNG-HOME-App (z. B. 0D01). Nie dieselbe Adresse in zwei Instanzen verwenden.",
+    "own_address_error": "Bitte genau 4 Hex-Ziffern eingeben",
+    "ESPHome Bluetooth proxies": "ESPHome-Bluetooth-Proxys",
+    "Proxy 1 (preferred)": "Proxy 1 (bevorzugt)",
+    "proxy_host_help": "Hostname oder IP-Adresse eines ESPHome-Bluetooth-Proxys mit aktiven Verbindungen",
+    "API encryption key": "API-Verschlüsselungsschlüssel",
+    "proxy_key_help": "Base64-Schlüssel aus api: encryption: key des Proxys, leer wenn der Proxy keine Verschlüsselung hat",
+    "Proxy 2 (fallback, optional)": "Proxy 2 (Reserve, optional)",
+    "Behaviour": "Verhalten",
+    "Poll interval (minutes)": "Abfrageintervall (Minuten)",
+    "poll_help": "Der Thermostat meldet Soll-Änderungen selbst; die Abfrage holt zusätzlich die Raumtemperatur",
+    "Boost duration (minutes)": "Boost-Dauer (Minuten)",
+    "Boost setpoint (°C)": "Boost-Sollwert (°C)"
+}

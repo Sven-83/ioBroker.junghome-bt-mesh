@@ -1,0 +1,19 @@
+{
+    "Mesh": "Mesh",
+    "JUNG HOME project export": "Экспорт проекта JUNG HOME",
+    "mesh_export_help": "Вставьте полное содержимое JungHome.json (приложение JUNG HOME: Проект → Передача проекта). Файл содержит все ключи Mesh и хранится в зашифрованном виде.",
+    "Own mesh address": "Собственный адрес Mesh",
+    "own_address_help": "Unicast-адрес адаптера из 4 шестнадцатеричных цифр вне диапазона приложения JUNG HOME (например, 0D01). Не используйте один адрес в двух экземплярах.",
+    "own_address_error": "Введите ровно 4 шестнадцатеричные цифры",
+    "ESPHome Bluetooth proxies": "Bluetooth-прокси ESPHome",
+    "Proxy 1 (preferred)": "Прокси 1 (основной)",
+    "proxy_host_help": "Имя хоста или IP-адрес Bluetooth-прокси ESPHome с активными подключениями",
+    "API encryption key": "Ключ шифрования API",
+    "proxy_key_help": "Ключ Base64 из api: encryption: key прокси; пусто, если шифрование не используется",
+    "Proxy 2 (fallback, optional)": "Прокси 2 (резервный, необязательно)",
+    "Behaviour": "Поведение",
+    "Poll interval (minutes)": "Интервал опроса (минуты)",
+    "poll_help": "Термостат сам сообщает об изменении уставки; опрос дополнительно получает температуру в комнате",
+    "Boost duration (minutes)": "Длительность буста (минуты)",
+    "Boost setpoint (°C)": "Уставка буста (°C)"
+}
