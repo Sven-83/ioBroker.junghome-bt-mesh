@@ -22,9 +22,13 @@ __export(config_exports, {
 });
 module.exports = __toCommonJS(config_exports);
 const HOST = /^[a-zA-Z0-9]([a-zA-Z0-9.-]{0,251}[a-zA-Z0-9])?$/;
-function intIn(value, min, max, fallback) {
+function numberIn(value, min, max, fallback, label, warnings) {
   const n = Number(value);
-  return Number.isFinite(n) && n >= min && n <= max ? n : fallback;
+  if (Number.isFinite(n) && n >= min && n <= max) {
+    return n;
+  }
+  warnings.push(`${label} must be between ${min} and ${max}, using ${fallback}`);
+  return fallback;
 }
 function proxy(host, key, label, errors) {
   const h = typeof host === "string" ? host.trim() : "";
@@ -46,6 +50,7 @@ function proxy(host, key, label, errors) {
 }
 function checkConfig(native) {
   const errors = [];
+  const warnings = [];
   const addrText = typeof native.ownAddress === "string" ? native.ownAddress.trim() : "";
   const ownAddress = /^[0-9a-fA-F]{4}$/.test(addrText) ? parseInt(addrText, 16) : NaN;
   if (Number.isNaN(ownAddress)) {
@@ -65,11 +70,12 @@ function checkConfig(native) {
     config: {
       ownAddress,
       proxies,
-      pollMs: intIn(native.pollMinutes, 1, 60, 5) * 6e4,
-      boostMinutes: intIn(native.boostMinutes, 5, 240, 60),
-      boostSetpoint: intIn(native.boostSetpoint, 5, 30, 30)
+      pollMs: numberIn(native.pollMinutes, 1, 60, 5, "Poll interval (minutes)", warnings) * 6e4,
+      boostMinutes: numberIn(native.boostMinutes, 1, 240, 60, "Boost duration (minutes)", warnings),
+      boostSetpoint: numberIn(native.boostSetpoint, 5, 30, 30, "Boost setpoint (\xB0C)", warnings)
     },
-    errors
+    errors,
+    warnings
   };
 }
 // Annotate the CommonJS export names for ESM import in node:

@@ -183,6 +183,15 @@ describe('config', () => {
         expect(r.config.pollMs).to.equal(300_000);
     });
 
+    it('allows a 1-minute boost and warns instead of silently replacing bad numbers', () => {
+        expect(checkConfig({ ...base, boostMinutes: 3 }).config.boostMinutes).to.equal(3);
+        const r = checkConfig({ ...base, boostMinutes: 0, pollMinutes: 999 });
+        expect(r.config.boostMinutes).to.equal(60);
+        expect(r.config.pollMs).to.equal(300_000);
+        expect(r.warnings).to.have.length(2);
+        expect(r.errors).to.deep.equal([]);
+    });
+
     it('reports bad values without echoing the key', () => {
         const r = checkConfig({ ...base, ownAddress: 'x', proxy1Key: 'secret-but-wrong', meshExport: '' });
         expect(r.errors.join('|'))

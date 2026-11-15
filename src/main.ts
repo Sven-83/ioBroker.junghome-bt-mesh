@@ -61,7 +61,10 @@ class JunghomeBtMesh extends utils.Adapter {
         await this.createInfoObjects();
         await this.setState('info.connection', { val: false, ack: true });
 
-        const { config, errors } = checkConfig(this.config);
+        const { config, errors, warnings } = checkConfig(this.config);
+        for (const w of warnings) {
+            this.log.warn(`Configuration: ${w}`);
+        }
         if (errors.length) {
             for (const e of errors) {
                 this.log.error(`Configuration: ${e}`);

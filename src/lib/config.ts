@@ -19,9 +19,20 @@ export interface CheckedConfig {
 
 const HOST = /^[a-zA-Z0-9]([a-zA-Z0-9.-]{0,251}[a-zA-Z0-9])?$/;
 
-function intIn(value: unknown, min: number, max: number, fallback: number): number {
+function numberIn(
+    value: unknown,
+    min: number,
+    max: number,
+    fallback: number,
+    label: string,
+    warnings: string[],
+): number {
     const n = Number(value);
-    return Number.isFinite(n) && n >= min && n <= max ? n : fallback;
+    if (Number.isFinite(n) && n >= min && n <= max) {
+        return n;
+    }
+    warnings.push(`${label} must be between ${min} and ${max}, using ${fallback}`);
+    return fallback;
 }
 
 function proxy(host: unknown, key: unknown, label: string, errors: string[]): ProxyConfig | null {
@@ -48,8 +59,13 @@ function proxy(host: unknown, key: unknown, label: string, errors: string[]): Pr
  *
  * @param native Instance configuration
  */
-export function checkConfig(native: ioBroker.AdapterConfig): { config: CheckedConfig; errors: string[] } {
+export function checkConfig(native: ioBroker.AdapterConfig): {
+    config: CheckedConfig;
+    errors: string[];
+    warnings: string[];
+} {
     const errors: string[] = [];
+    const warnings: string[] = [];
     const addrText = typeof native.ownAddress === 'string' ? native.ownAddress.trim() : '';
     const ownAddress = /^[0-9a-fA-F]{4}$/.test(addrText) ? parseInt(addrText, 16) : NaN;
     if (Number.isNaN(ownAddress)) {
@@ -69,10 +85,11 @@ export function checkConfig(native: ioBroker.AdapterConfig): { config: CheckedCo
         config: {
             ownAddress,
             proxies,
-            pollMs: intIn(native.pollMinutes, 1, 60, 5) * 60_000,
-            boostMinutes: intIn(native.boostMinutes, 5, 240, 60),
-            boostSetpoint: intIn(native.boostSetpoint, 5, 30, 30),
+            pollMs: numberIn(native.pollMinutes, 1, 60, 5, 'Poll interval (minutes)', warnings) * 60_000,
+            boostMinutes: numberIn(native.boostMinutes, 1, 240, 60, 'Boost duration (minutes)', warnings),
+            boostSetpoint: numberIn(native.boostSetpoint, 5, 30, 30, 'Boost setpoint (°C)', warnings),
         },
         errors,
+        warnings,
     };
 }
