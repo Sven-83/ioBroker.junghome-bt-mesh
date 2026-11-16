@@ -15,5 +15,16 @@
     "Poll interval (minutes)": "Opvraaginterval (minuten)",
     "poll_help": "De thermostaat meldt wijzigingen van het setpoint zelf; opvragen haalt ook de kamertemperatuur op",
     "Boost duration (minutes)": "Boostduur (minuten)",
-    "Boost setpoint (°C)": "Boost-setpoint (°C)"
+    "Boost setpoint (°C)": "Boost-setpoint (°C)",
+    "Vacation setback": "Vakantieverlaging",
+    "vacation_info": "Inschakelen met vacation.active. Alle gekoppelde thermostaten gaan naar de vakantie-instelling; de vorige instellingen komen het opgegeven aantal uren vóór vacation.returnAt terug. Een handmatige wijziging tijdens de vakantie geldt als bedoeld: die ruimte verlaat de verlaging en er wordt een bericht verstuurd.",
+    "Vacation setpoint (°C)": "Vakantie-instelling (°C)",
+    "Pre-heating before the return (hours)": "Voorverwarmen vóór terugkomst (uren)",
+    "preheat_help": "Vloerverwarming is traag: de vorige instellingen komen zo lang vóór terugkomst terug",
+    "Messages": "Berichten",
+    "Send messages": "Berichten versturen",
+    "notify_help": "Tekstbericht als een ruimte tijdens de vakantie met de hand wordt gewijzigd",
+    "Telegram instance": "Telegram-instantie",
+    "Receivers": "Ontvangers",
+    "notify_users_help": "Telegram-gebruikersnamen, gescheiden door komma's. Leeg: alle gebruikers van de instantie."
 }

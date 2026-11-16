@@ -93,7 +93,12 @@
         "proxy2Key": "",
         "pollMinutes": 5,
         "boostMinutes": 60,
-        "boostSetpoint": 30
+        "boostSetpoint": 30,
+        "vacationSetpoint": 17,
+        "vacationPreheatHours": 24,
+        "notifyEnabled": true,
+        "notifyInstance": "telegram.0",
+        "notifyUsers": ""
     },
     "encryptedNative": [
         "meshExport",

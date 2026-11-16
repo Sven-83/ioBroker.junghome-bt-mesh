@@ -173,6 +173,11 @@ describe('config', () => {
         pollMinutes: 5,
         boostMinutes: 60,
         boostSetpoint: 30,
+        vacationSetpoint: 17,
+        vacationPreheatHours: 24,
+        notifyEnabled: true,
+        notifyInstance: 'telegram.0',
+        notifyUsers: '',
     };
 
     it('accepts a valid configuration', () => {
@@ -190,6 +195,22 @@ describe('config', () => {
         expect(r.config.pollMs).to.equal(300_000);
         expect(r.warnings).to.have.length(2);
         expect(r.errors).to.deep.equal([]);
+    });
+
+    it('reads the vacation and message settings', () => {
+        const r = checkConfig(base);
+        expect(r.config.vacationSetpoint).to.equal(17);
+        expect(r.config.vacationPreheatHours).to.equal(24);
+        expect(r.config.notifyInstance).to.equal('telegram.0');
+        expect(r.config.notifyUsers).to.deep.equal([]);
+        const c = checkConfig({ ...base, notifyInstance: 'system.adapter.telegram.1', notifyUsers: 'a, b,a' }).config;
+        expect(c.notifyInstance).to.equal('telegram.1');
+        expect(c.notifyUsers).to.deep.equal(['a', 'b']);
+        expect(checkConfig({ ...base, notifyEnabled: false }).config.notifyInstance).to.equal('');
+        const bad = checkConfig({ ...base, notifyInstance: 'not an instance', vacationSetpoint: 40 });
+        expect(bad.config.notifyInstance).to.equal('');
+        expect(bad.config.vacationSetpoint).to.equal(17);
+        expect(bad.warnings).to.have.length(2);
     });
 
     it('reports bad values without echoing the key', () => {

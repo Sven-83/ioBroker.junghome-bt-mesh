@@ -15,5 +15,16 @@
     "Poll interval (minutes)": "Intervalle d'interrogation (minutes)",
     "poll_help": "Le thermostat signale lui-même les changements de consigne ; l'interrogation récupère aussi la température ambiante",
     "Boost duration (minutes)": "Durée du boost (minutes)",
-    "Boost setpoint (°C)": "Consigne du boost (°C)"
+    "Boost setpoint (°C)": "Consigne du boost (°C)",
+    "Vacation setback": "Abaissement vacances",
+    "vacation_info": "Activer avec vacation.active. Tous les thermostats connectés passent à la consigne vacances ; les consignes précédentes reviennent le nombre d'heures indiqué avant vacation.returnAt. Une consigne modifiée à la main pendant les vacances est considérée comme voulue : la pièce quitte l'abaissement et un message est envoyé.",
+    "Vacation setpoint (°C)": "Consigne vacances (°C)",
+    "Pre-heating before the return (hours)": "Préchauffage avant le retour (heures)",
+    "preheat_help": "Le plancher chauffant est lent : les consignes précédentes reviennent ce temps avant le retour",
+    "Messages": "Messages",
+    "Send messages": "Envoyer des messages",
+    "notify_help": "Message texte lorsqu'une pièce est modifiée à la main pendant les vacances",
+    "Telegram instance": "Instance Telegram",
+    "Receivers": "Destinataires",
+    "notify_users_help": "Noms d'utilisateur Telegram séparés par des virgules. Vide : tous les utilisateurs de l'instance."
 }

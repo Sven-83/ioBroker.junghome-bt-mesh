@@ -48,6 +48,28 @@ function proxy(host, key, label, errors) {
   }
   return { host: h, port: 6053, encryptionKey: k };
 }
+function messenger(enabled, instance, warnings) {
+  if (enabled === false) {
+    return "";
+  }
+  const i = typeof instance === "string" ? instance.trim().replace(/^system\.adapter\./, "") : "";
+  if (!i) {
+    return "telegram.0";
+  }
+  if (/^[a-z0-9][a-z0-9_-]*\.\d{1,3}$/.test(i)) {
+    return i;
+  }
+  warnings.push(`"${i}" is not an adapter instance like telegram.0, messages are off`);
+  return "";
+}
+function receivers(value) {
+  const list = typeof value === "string" ? value : "";
+  return [
+    ...new Set(
+      list.split(",").map((u) => u.trim()).filter(Boolean)
+    )
+  ];
+}
 function checkConfig(native) {
   const errors = [];
   const warnings = [];
@@ -72,7 +94,18 @@ function checkConfig(native) {
       proxies,
       pollMs: numberIn(native.pollMinutes, 1, 60, 5, "Poll interval (minutes)", warnings) * 6e4,
       boostMinutes: numberIn(native.boostMinutes, 1, 240, 60, "Boost duration (minutes)", warnings),
-      boostSetpoint: numberIn(native.boostSetpoint, 5, 30, 30, "Boost setpoint (\xB0C)", warnings)
+      boostSetpoint: numberIn(native.boostSetpoint, 5, 30, 30, "Boost setpoint (\xB0C)", warnings),
+      vacationSetpoint: numberIn(native.vacationSetpoint, 5, 30, 17, "Vacation setpoint (\xB0C)", warnings),
+      vacationPreheatHours: numberIn(
+        native.vacationPreheatHours,
+        0,
+        96,
+        24,
+        "Pre-heating before the return (hours)",
+        warnings
+      ),
+      notifyInstance: messenger(native.notifyEnabled, native.notifyInstance, warnings),
+      notifyUsers: receivers(native.notifyUsers)
     },
     errors,
     warnings

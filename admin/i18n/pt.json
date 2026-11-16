@@ -15,5 +15,16 @@
     "Poll interval (minutes)": "Intervalo de consulta (minutos)",
     "poll_help": "O termóstato comunica alterações do setpoint sozinho; a consulta obtém também a temperatura ambiente",
     "Boost duration (minutes)": "Duração do boost (minutos)",
-    "Boost setpoint (°C)": "Setpoint do boost (°C)"
+    "Boost setpoint (°C)": "Setpoint do boost (°C)",
+    "Vacation setback": "Redução durante as férias",
+    "vacation_info": "Ligar com vacation.active. Todos os termóstatos ligados passam para o valor de férias; os valores anteriores voltam as horas indicadas antes de vacation.returnAt. Uma alteração manual durante as férias é considerada intencional: a divisão sai da redução e é enviada uma mensagem.",
+    "Vacation setpoint (°C)": "Valor de férias (°C)",
+    "Pre-heating before the return (hours)": "Pré-aquecimento antes do regresso (horas)",
+    "preheat_help": "O piso radiante é lento: os valores anteriores voltam este tempo antes do regresso",
+    "Messages": "Mensagens",
+    "Send messages": "Enviar mensagens",
+    "notify_help": "Mensagem de texto quando uma divisão é alterada manualmente durante as férias",
+    "Telegram instance": "Instância Telegram",
+    "Receivers": "Destinatários",
+    "notify_users_help": "Nomes de utilizador do Telegram separados por vírgulas. Vazio: todos os utilizadores da instância."
 }

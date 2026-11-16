@@ -21,6 +21,16 @@ declare global {
             boostMinutes: number;
             /** Setpoint during a boost in °C */
             boostSetpoint: number;
+            /** Setpoint during the vacation setback in °C */
+            vacationSetpoint: number;
+            /** Hours before the return when the previous setpoints come back */
+            vacationPreheatHours: number;
+            /** Send messages (e.g. a room changed by hand during the vacation) */
+            notifyEnabled: boolean;
+            /** Messenger instance, e.g. telegram.0 */
+            notifyInstance: string;
+            /** Receivers (Telegram user names, comma separated), empty = all users */
+            notifyUsers: string;
         }
     }
 }

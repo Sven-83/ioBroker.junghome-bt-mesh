@@ -18,6 +18,7 @@ Status: early version, tested with one room thermostat (JUNG HOME app 2.3.0, exp
 - Room temperature measured by the thermostat (polled, default every 5 minutes)
 - Heating output (valve open) and operating mode
 - **Boost** with own duration (default 60 min, the device boost lasts only 5 min): raises the setpoint and restores the previous value afterwards, also across adapter restarts. A manual setpoint change ends the boost without restore.
+- **Vacation setback**: all thermostats go to a low setpoint (default 17 °C) and come back to their previous setpoints a while before the return (default 24 h, underfloor heating is slow). A room changed by hand during the vacation counts as intended: it leaves the setback and a Telegram message names the room.
 - **Lead sensor** per thermostat: any temperature state (e.g. a Zigbee sensor) can replace the thermostat's value for display and colour. The thermostat still regulates with its own sensor.
 - Colour per room (blue = cold, neutral, orange = warm) for floor plans
 
@@ -37,6 +38,9 @@ Status: early version, tested with one room thermostat (JUNG HOME app 2.3.0, exp
 | API encryption key | `api: encryption: key` of the proxy (base64), empty without encryption. |
 | Poll interval | Fallback polling in minutes. |
 | Boost duration / setpoint | Duration in minutes and setpoint during a boost. |
+| Vacation setpoint | Setpoint during the vacation setback (default 17 °C). |
+| Pre-heating before the return | Hours before `vacation.returnAt` when the previous setpoints come back (default 24). |
+| Messages | Telegram instance and receivers (empty = all users) for the message about a room changed by hand during the vacation. |
 
 ### States (per thermostat, `thermostats.<address>`)
 
@@ -52,6 +56,17 @@ Status: early version, tested with one room thermostat (JUNG HOME app 2.3.0, exp
 | `leadSensor` | string | yes | Object ID of a temperature state, empty = thermostat |
 | `color` | string | no | `#rrggbb` for the floor plan |
 | `lastSeen` | timestamp | no | Last message from the thermostat |
+
+### Vacation setback (`vacation`)
+
+| State | Type | Write | Meaning |
+|---|---|---|---|
+| `active` | boolean | yes | Start / stop the vacation setback |
+| `returnAt` | timestamp | yes | Return; also accepts `YYYY-MM-DD`, `DD.MM.YYYY` (00:00 local time) or an ISO date/time. `0` = until switched off. Set it before switching on; can be changed while running. |
+| `preheatFrom` | timestamp | no | When the previous setpoints come back |
+| `rooms` | number | no | Thermostats that are still lowered |
+
+Rooms already at or below the vacation setpoint stay as they are. A running boost ends when the setback starts; a boost started during the vacation returns to the vacation setpoint.
 
 `info.connection` is `true` while the mesh connection through a proxy is up; `info.proxy` and `info.rssi` show which proxy is used.
 
@@ -73,6 +88,10 @@ JUNG and JUNG HOME are trademarks of ALBRECHT JUNG GMBH & CO. KG; this project i
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- (Sven-83) vacation setback with pre-heating before the return and a Telegram message when a room is changed by hand during the vacation
+
 ### 0.0.1 (2026-11-15)
 
 - (Sven-83) initial release

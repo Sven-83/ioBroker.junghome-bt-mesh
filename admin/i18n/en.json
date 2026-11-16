@@ -15,5 +15,16 @@
     "Poll interval (minutes)": "Poll interval (minutes)",
     "poll_help": "The thermostat reports setpoint changes by itself; polling also fetches the room temperature",
     "Boost duration (minutes)": "Boost duration (minutes)",
-    "Boost setpoint (°C)": "Boost setpoint (°C)"
+    "Boost setpoint (°C)": "Boost setpoint (°C)",
+    "Vacation setback": "Vacation setback",
+    "vacation_info": "Switch on with vacation.active. All connected thermostats go to the vacation setpoint; the previous setpoints come back the given hours before vacation.returnAt. A setpoint changed by hand during the vacation counts as intended: that room leaves the setback and a message is sent.",
+    "Vacation setpoint (°C)": "Vacation setpoint (°C)",
+    "Pre-heating before the return (hours)": "Pre-heating before the return (hours)",
+    "preheat_help": "Underfloor heating is slow: the previous setpoints come back this long before the return",
+    "Messages": "Messages",
+    "Send messages": "Send messages",
+    "notify_help": "Text message when a room is changed by hand during the vacation",
+    "Telegram instance": "Telegram instance",
+    "Receivers": "Receivers",
+    "notify_users_help": "Telegram user names, separated by commas. Empty: all users of the instance."
 }

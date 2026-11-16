@@ -15,6 +15,14 @@ export interface CheckedConfig {
     boostMinutes: number;
     /** Setpoint during a boost in °C */
     boostSetpoint: number;
+    /** Setpoint during the vacation setback in °C */
+    vacationSetpoint: number;
+    /** Hours before the return when the previous setpoints come back */
+    vacationPreheatHours: number;
+    /** Messenger instance for messages (e.g. telegram.0), empty = no messages */
+    notifyInstance: string;
+    /** Receivers (user names), empty = all users of the instance */
+    notifyUsers: string[];
 }
 
 const HOST = /^[a-zA-Z0-9]([a-zA-Z0-9.-]{0,251}[a-zA-Z0-9])?$/;
@@ -54,6 +62,33 @@ function proxy(host: unknown, key: unknown, label: string, errors: string[]): Pr
     return { host: h, port: 6053, encryptionKey: k };
 }
 
+function messenger(enabled: unknown, instance: unknown, warnings: string[]): string {
+    if (enabled === false) {
+        return '';
+    }
+    const i = typeof instance === 'string' ? instance.trim().replace(/^system\.adapter\./, '') : '';
+    if (!i) {
+        return 'telegram.0';
+    }
+    if (/^[a-z0-9][a-z0-9_-]*\.\d{1,3}$/.test(i)) {
+        return i;
+    }
+    warnings.push(`"${i}" is not an adapter instance like telegram.0, messages are off`);
+    return '';
+}
+
+function receivers(value: unknown): string[] {
+    const list = typeof value === 'string' ? value : '';
+    return [
+        ...new Set(
+            list
+                .split(',')
+                .map(u => u.trim())
+                .filter(Boolean),
+        ),
+    ];
+}
+
 /**
  * Checks the configuration. Returns the checked values or a list of errors (never containing secrets).
  *
@@ -88,6 +123,17 @@ export function checkConfig(native: ioBroker.AdapterConfig): {
             pollMs: numberIn(native.pollMinutes, 1, 60, 5, 'Poll interval (minutes)', warnings) * 60_000,
             boostMinutes: numberIn(native.boostMinutes, 1, 240, 60, 'Boost duration (minutes)', warnings),
             boostSetpoint: numberIn(native.boostSetpoint, 5, 30, 30, 'Boost setpoint (°C)', warnings),
+            vacationSetpoint: numberIn(native.vacationSetpoint, 5, 30, 17, 'Vacation setpoint (°C)', warnings),
+            vacationPreheatHours: numberIn(
+                native.vacationPreheatHours,
+                0,
+                96,
+                24,
+                'Pre-heating before the return (hours)',
+                warnings,
+            ),
+            notifyInstance: messenger(native.notifyEnabled, native.notifyInstance, warnings),
+            notifyUsers: receivers(native.notifyUsers),
         },
         errors,
         warnings,

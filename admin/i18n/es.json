@@ -15,5 +15,16 @@
     "Poll interval (minutes)": "Intervalo de consulta (minutos)",
     "poll_help": "El termostato informa por sí mismo de los cambios de consigna; la consulta obtiene además la temperatura ambiente",
     "Boost duration (minutes)": "Duración del boost (minutos)",
-    "Boost setpoint (°C)": "Consigna del boost (°C)"
+    "Boost setpoint (°C)": "Consigna del boost (°C)",
+    "Vacation setback": "Reducción por vacaciones",
+    "vacation_info": "Activar con vacation.active. Todos los termostatos conectados pasan a la consigna de vacaciones; las consignas anteriores vuelven las horas indicadas antes de vacation.returnAt. Un cambio manual durante las vacaciones se considera intencionado: la habitación sale de la reducción y se envía un mensaje.",
+    "Vacation setpoint (°C)": "Consigna de vacaciones (°C)",
+    "Pre-heating before the return (hours)": "Precalentamiento antes del regreso (horas)",
+    "preheat_help": "La calefacción por suelo es lenta: las consignas anteriores vuelven este tiempo antes del regreso",
+    "Messages": "Mensajes",
+    "Send messages": "Enviar mensajes",
+    "notify_help": "Mensaje de texto cuando se cambia una habitación a mano durante las vacaciones",
+    "Telegram instance": "Instancia de Telegram",
+    "Receivers": "Destinatarios",
+    "notify_users_help": "Nombres de usuario de Telegram separados por comas. Vacío: todos los usuarios de la instancia."
 }

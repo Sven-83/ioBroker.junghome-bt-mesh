@@ -23,9 +23,20 @@ import {
     validateSetpoint,
     type ThermostatUpdate,
 } from './lib/thermostat';
+import {
+    manualChangeText,
+    parseReturnAt,
+    parseVacation,
+    planSetback,
+    preheatFrom,
+    vacationAfterReport,
+    vacationDue,
+    type VacationState,
+} from './lib/vacation';
 
 const CONFIRM_TIMEOUT_MS = 4_000;
 const MESSAGE_GAP_MS = 300;
+const NOTIFY_TIMEOUT_MS = 15_000;
 
 /** Runtime values of one thermostat */
 interface Room {
@@ -49,6 +60,10 @@ class JunghomeBtMesh extends utils.Adapter {
     private pollTimer: ioBroker.Timeout | undefined;
     private tid = Math.floor(Math.random() * 256);
     private unloading = false;
+    private vacation: VacationState | null = null;
+    private vacationTimer: ioBroker.Timeout | undefined;
+    private vacationBusy = false;
+    private german = true;
 
     public constructor(options: Partial<utils.AdapterOptions> = {}) {
         super({ ...options, name: 'junghome-bt-mesh' });
@@ -88,6 +103,12 @@ class JunghomeBtMesh extends utils.Adapter {
             return;
         }
         this.cfg = config;
+        try {
+            const sys = await this.getForeignObjectAsync('system.config');
+            this.german = (sys?.common as { language?: string } | undefined)?.language !== 'en';
+        } catch {
+            // keep German
+        }
 
         const reserveState = await this.getStateAsync('info.seqReserve');
         const ivState = await this.getStateAsync('info.ivIndex');
@@ -112,7 +133,9 @@ class JunghomeBtMesh extends utils.Adapter {
             await this.createRoom(t);
         }
         await this.cleanupRooms();
+        await this.createVacationObjects();
         this.subscribeStates('thermostats.*');
+        this.subscribeStates('vacation.*');
 
         this.link = new MeshLink(
             config.proxies,
@@ -303,6 +326,69 @@ class JunghomeBtMesh extends utils.Adapter {
         }
     }
 
+    private async createVacationObjects(): Promise<void> {
+        await this.extendObject('vacation', { type: 'channel', common: { name: 'Vacation setback' }, native: {} });
+        const defs: Array<[string, ioBroker.StateCommon]> = [
+            [
+                'active',
+                {
+                    name: 'Vacation setback active',
+                    type: 'boolean',
+                    role: 'switch',
+                    read: true,
+                    write: true,
+                    def: false,
+                },
+            ],
+            [
+                'returnAt',
+                {
+                    name: 'Return (ms, ISO date or DD.MM.YYYY; 0 = until switched off)',
+                    type: 'number',
+                    role: 'date',
+                    read: true,
+                    write: true,
+                    def: 0,
+                },
+            ],
+            [
+                'preheatFrom',
+                {
+                    name: 'Previous setpoints come back at',
+                    type: 'number',
+                    role: 'value.time',
+                    read: true,
+                    write: false,
+                    def: 0,
+                },
+            ],
+            ['rooms', { name: 'Lowered thermostats', type: 'number', role: 'value', read: true, write: false, def: 0 }],
+            [
+                'state',
+                { name: 'Vacation data (internal)', type: 'string', role: 'json', read: true, write: false, def: '' },
+            ],
+        ];
+        for (const [sid, common] of defs) {
+            await this.extendObject(`vacation.${sid}`, { type: 'state', common, native: {} });
+        }
+        const raw = await this.getStateAsync('vacation.state');
+        this.vacation = parseVacation(raw?.val);
+        if (this.vacation) {
+            const known = new Set([...this.rooms.values()].map(r => r.id));
+            for (const id of Object.keys(this.vacation.rooms)) {
+                if (!known.has(id)) {
+                    delete this.vacation.rooms[id];
+                }
+            }
+            await this.saveVacation();
+            this.armVacationTimer();
+        } else {
+            await this.setState('vacation.active', { val: false, ack: true });
+            await this.setState('vacation.preheatFrom', { val: 0, ack: true });
+            await this.setState('vacation.rooms', { val: 0, ack: true });
+        }
+    }
+
     /** Removes channels of thermostats that are no longer in the export */
     private async cleanupRooms(): Promise<void> {
         const objs = await this.getObjectViewAsync('system', 'channel', {
@@ -330,6 +416,9 @@ class JunghomeBtMesh extends utils.Adapter {
                 if (room.boost && boostRemaining(room.boost, Date.now()) === 0) {
                     await this.endBoost(room, 'time is up');
                 }
+            }
+            if (this.vacation && vacationDue(this.vacation, Date.now())) {
+                await this.endVacation('pre-heating before the return');
             }
             await this.pollAll();
         } catch (e) {
@@ -386,15 +475,21 @@ class JunghomeBtMesh extends utils.Adapter {
                     if (pending && Math.abs(pending.celsius - u.value) < 0.01) {
                         pending.resolve(true);
                         room.pendingSetpoint = null;
-                    } else if (
-                        room.boost &&
-                        !room.pendingSetpoint &&
-                        boostAfterReport(room.boost, u.value) === 'cancel'
-                    ) {
-                        this.log.info(
-                            `${room.info.name}: setpoint changed during the boost, boost ends without restore`,
-                        );
-                        await this.clearBoost(room);
+                    } else if (!room.pendingSetpoint) {
+                        // a change by hand at the thermostat
+                        if (
+                            this.vacation &&
+                            vacationAfterReport(this.vacation, room.id, u.value, room.boost?.target ?? null) ===
+                                'manual'
+                        ) {
+                            await this.leaveVacation(room, u.value, true);
+                        }
+                        if (room.boost && boostAfterReport(room.boost, u.value) === 'cancel') {
+                            this.log.info(
+                                `${room.info.name}: setpoint changed during the boost, boost ends without restore`,
+                            );
+                            await this.clearBoost(room);
+                        }
                     }
                     await this.setState(`${room.id}.setpoint`, { val: u.value, ack: true });
                     break;
@@ -596,6 +691,246 @@ class JunghomeBtMesh extends utils.Adapter {
         await this.setState(`${room.id}.boostUntil`, { val: 0, ack: true });
     }
 
+    // ---------- vacation ----------
+
+    private async saveVacation(): Promise<void> {
+        const v = this.vacation;
+        await this.setState('vacation.state', { val: v ? JSON.stringify(v) : '', ack: true });
+        await this.setState('vacation.active', { val: !!v, ack: true });
+        if (v) {
+            await this.setState('vacation.returnAt', { val: v.returnAt, ack: true });
+        }
+        await this.setState('vacation.preheatFrom', { val: v ? preheatFrom(v) : 0, ack: true });
+        await this.setState('vacation.rooms', { val: v ? Object.keys(v.rooms).length : 0, ack: true });
+    }
+
+    private armVacationTimer(): void {
+        if (this.vacationTimer) {
+            this.clearTimeout(this.vacationTimer);
+            this.vacationTimer = undefined;
+        }
+        const v = this.vacation;
+        if (!v || v.returnAt === 0) {
+            return;
+        }
+        // keep single timers below the 32-bit limit of setTimeout
+        const ms = Math.min(Math.max(0, preheatFrom(v) - Date.now()), 2 ** 31 - 1);
+        this.vacationTimer = this.setTimeout(() => {
+            this.vacationTimer = undefined;
+            if (this.vacation && !vacationDue(this.vacation, Date.now())) {
+                this.armVacationTimer();
+                return;
+            }
+            void this.endVacation('pre-heating before the return');
+        }, ms);
+    }
+
+    private async onVacationCommand(id: 'vacation.active' | 'vacation.returnAt', value: unknown): Promise<void> {
+        if (this.vacationBusy) {
+            this.log.warn('Vacation setback: still busy with the last command, please try again');
+            await this.saveVacation();
+            return;
+        }
+        this.vacationBusy = true;
+        try {
+            if (id === 'vacation.returnAt') {
+                await this.onReturnAtCommand(value);
+            } else if (value === true || value === 'true' || value === 1) {
+                await this.beginVacation();
+            } else {
+                await this.endVacation('switched off');
+            }
+        } finally {
+            this.vacationBusy = false;
+        }
+    }
+
+    private async onReturnAtCommand(value: unknown): Promise<void> {
+        const r = parseReturnAt(value, Date.now());
+        if (!r.ok) {
+            this.log.warn(`Vacation setback: ${r.error}`);
+            const old = await this.getStateAsync('vacation.returnAt');
+            await this.setState('vacation.returnAt', {
+                val: this.vacation ? this.vacation.returnAt : typeof old?.val === 'number' ? old.val : 0,
+                ack: true,
+            });
+            return;
+        }
+        if (!this.vacation) {
+            // remembered for the next start
+            await this.setState('vacation.returnAt', { val: r.at, ack: true });
+            return;
+        }
+        this.vacation.returnAt = r.at;
+        this.log.info(`Vacation setback: return set to ${r.at ? new Date(r.at).toISOString() : 'open end'}`);
+        await this.saveVacation();
+        if (vacationDue(this.vacation, Date.now())) {
+            await this.endVacation('pre-heating before the return');
+        } else {
+            this.armVacationTimer();
+        }
+    }
+
+    private async beginVacation(): Promise<void> {
+        if (this.vacation) {
+            await this.saveVacation();
+            return;
+        }
+        const cfg = this.cfg!;
+        const refuse = async (why: string): Promise<void> => {
+            this.log.warn(`Vacation setback not started: ${why}`);
+            await this.setState('vacation.active', { val: false, ack: true });
+        };
+        if (!this.link?.ready) {
+            return refuse('not connected to the mesh');
+        }
+        const ret = await this.getStateAsync('vacation.returnAt');
+        const parsed = parseReturnAt(ret?.val ?? 0, Date.now());
+        if (!parsed.ok) {
+            return refuse(parsed.error);
+        }
+        const draft = { returnAt: parsed.at, preheatHours: cfg.vacationPreheatHours };
+        if (vacationDue(draft, Date.now())) {
+            return refuse(`the return is less than ${cfg.vacationPreheatHours} h away`);
+        }
+        const rooms = [...this.rooms.values()];
+        const plan = planSetback(
+            rooms.map(r => ({ id: r.id, setpoint: r.boost ? r.boost.previous : r.setpoint })),
+            cfg.vacationSetpoint,
+        );
+        for (const id of plan.unknown) {
+            this.log.warn(`Vacation setback: ${this.nameOf(id)} skipped, its setpoint is not known yet`);
+        }
+        for (const id of plan.alreadyLow) {
+            this.log.info(`Vacation setback: ${this.nameOf(id)} is already at or below ${cfg.vacationSetpoint} °C`);
+        }
+        // store first, so our own setpoint reports are never taken for a change by hand
+        const vacation: VacationState = { ...draft, target: cfg.vacationSetpoint, rooms: { ...plan.lower } };
+        this.vacation = vacation;
+        await this.saveVacation();
+        let failed = 0;
+        for (const room of rooms) {
+            if (!(room.id in plan.lower)) {
+                continue;
+            }
+            if (room.boost) {
+                this.log.info(`${room.info.name}: boost ends for the vacation setback`);
+                await this.clearBoost(room);
+            }
+            if (!(await this.writeSetpoint(room, cfg.vacationSetpoint))) {
+                failed++;
+                delete vacation.rooms[room.id];
+            }
+        }
+        const lowered = Object.keys(vacation.rooms).length;
+        if (failed && !lowered) {
+            this.vacation = null;
+            await this.saveVacation();
+            this.log.warn('Vacation setback not started: no thermostat accepted the setpoint');
+            return;
+        }
+        await this.saveVacation();
+        this.armVacationTimer();
+        const until = vacation.returnAt
+            ? `, previous setpoints come back at ${new Date(preheatFrom(vacation)).toISOString()}`
+            : ', until switched off';
+        this.log.info(
+            `Vacation setback on: ${lowered} thermostat(s) at ${cfg.vacationSetpoint} °C${failed ? `, ${failed} failed` : ''}${until}`,
+        );
+    }
+
+    private async endVacation(why: string): Promise<void> {
+        const v = this.vacation;
+        if (!v) {
+            await this.saveVacation();
+            return;
+        }
+        if (this.vacationTimer) {
+            this.clearTimeout(this.vacationTimer);
+            this.vacationTimer = undefined;
+        }
+        if (!this.link?.ready) {
+            // restored in onLinkReady once the time has come; a manual switch-off has to be repeated
+            this.log.warn(`Vacation setback ends (${why}) as soon as the mesh is connected again`);
+            if (why === 'switched off') {
+                v.returnAt = Date.now();
+                v.preheatHours = 0;
+            }
+            await this.saveVacation();
+            return;
+        }
+        for (const [id, previous] of Object.entries(v.rooms)) {
+            const room = [...this.rooms.values()].find(r => r.id === id);
+            if (!room) {
+                delete v.rooms[id];
+                continue;
+            }
+            if (room.boost) {
+                await this.clearBoost(room);
+            }
+            if (await this.writeSetpoint(room, previous)) {
+                delete v.rooms[id];
+                await this.saveVacation();
+            }
+        }
+        const left = Object.keys(v.rooms).length;
+        if (left) {
+            this.log.warn(`Vacation setback: ${left} setpoint(s) could not be restored, retry in 1 min`);
+            await this.saveVacation();
+            this.vacationTimer = this.setTimeout(() => void this.endVacation(why), 60_000);
+            return;
+        }
+        this.vacation = null;
+        await this.saveVacation();
+        await this.setState('vacation.returnAt', { val: 0, ack: true });
+        this.log.info(`Vacation setback ended (${why}), previous setpoints restored`);
+    }
+
+    /**
+     * A lowered room was changed by hand: the change counts as intended, the room leaves the setback.
+     *
+     * @param room Thermostat
+     * @param celsius New setpoint
+     * @param atDevice Changed at the thermostat (true) or through ioBroker (false)
+     */
+    private async leaveVacation(room: Room, celsius: number, atDevice: boolean): Promise<void> {
+        if (!this.vacation || !(room.id in this.vacation.rooms)) {
+            return;
+        }
+        delete this.vacation.rooms[room.id];
+        await this.saveVacation();
+        this.log.info(
+            `${room.info.name}: setpoint ${celsius} °C set by hand during the vacation, the room leaves the setback`,
+        );
+        void this.notify(manualChangeText(this.german, room.info.name, celsius, atDevice));
+    }
+
+    private nameOf(id: string): string {
+        return [...this.rooms.values()].find(r => r.id === id)?.info.name ?? id;
+    }
+
+    /**
+     * Sends a text through the messenger instance (Telegram). Failures are only logged.
+     *
+     * @param text Message
+     */
+    private async notify(text: string): Promise<void> {
+        const cfg = this.cfg;
+        if (!cfg?.notifyInstance) {
+            return;
+        }
+        const users = cfg.notifyUsers.length ? cfg.notifyUsers : [''];
+        for (const user of users) {
+            try {
+                await this.sendToAsync(cfg.notifyInstance, 'send', user ? { text, user } : { text }, {
+                    timeout: NOTIFY_TIMEOUT_MS,
+                });
+            } catch (e) {
+                this.log.warn(`Message via ${cfg.notifyInstance} not sent: ${(e as Error).message}`);
+            }
+        }
+    }
+
     // ---------- state changes ----------
 
     private async onStateChange(id: string, state: ioBroker.State | null | undefined): Promise<void> {
@@ -608,6 +943,11 @@ class JunghomeBtMesh extends utils.Adapter {
                 return;
             }
             if (state.ack) {
+                return;
+            }
+            const local = id.slice(this.namespace.length + 1);
+            if (local === 'vacation.active' || local === 'vacation.returnAt') {
+                await this.onVacationCommand(local, state.val);
                 return;
             }
             const m = /^thermostats\.([0-9A-F]{4})\.(setpoint|boost|leadSensor)$/.exec(
@@ -650,13 +990,18 @@ class JunghomeBtMesh extends utils.Adapter {
             await restore();
             return;
         }
+        const celsius = roundSetpoint(v.celsius);
         if (room.boost) {
             this.log.info(`${room.info.name}: manual setpoint during the boost, boost ends without restore`);
             await this.clearBoost(room);
         }
-        const ok = await this.writeSetpoint(room, roundSetpoint(v.celsius));
+        const ok = await this.writeSetpoint(room, celsius);
         if (!ok) {
             await restore();
+            return;
+        }
+        if (this.vacation && room.id in this.vacation.rooms && Math.abs(celsius - this.vacation.target) >= 0.01) {
+            await this.leaveVacation(room, celsius, false);
         }
     }
 
@@ -674,6 +1019,9 @@ class JunghomeBtMesh extends utils.Adapter {
         try {
             if (this.pollTimer) {
                 this.clearTimeout(this.pollTimer);
+            }
+            if (this.vacationTimer) {
+                this.clearTimeout(this.vacationTimer);
             }
             for (const room of this.rooms.values()) {
                 if (room.boostTimer) {

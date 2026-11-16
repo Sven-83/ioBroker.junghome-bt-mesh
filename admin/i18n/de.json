@@ -15,5 +15,16 @@
     "Poll interval (minutes)": "Abfrageintervall (Minuten)",
     "poll_help": "Der Thermostat meldet Soll-Änderungen selbst; die Abfrage holt zusätzlich die Raumtemperatur",
     "Boost duration (minutes)": "Boost-Dauer (Minuten)",
-    "Boost setpoint (°C)": "Boost-Sollwert (°C)"
+    "Boost setpoint (°C)": "Boost-Sollwert (°C)",
+    "Vacation setback": "Urlaubsabsenkung",
+    "vacation_info": "Einschalten über vacation.active. Alle angebundenen Thermostate gehen auf den Urlaubs-Sollwert; die vorherigen Sollwerte kommen die angegebenen Stunden vor vacation.returnAt zurück. Eine Handänderung während des Urlaubs gilt als gewollt: Der Raum verlässt die Absenkung und es kommt eine Nachricht.",
+    "Vacation setpoint (°C)": "Urlaubs-Sollwert (°C)",
+    "Pre-heating before the return (hours)": "Vorheizen vor der Rückkehr (Stunden)",
+    "preheat_help": "Fußbodenheizung ist träge: Die vorherigen Sollwerte kommen so lange vor der Rückkehr zurück",
+    "Messages": "Nachrichten",
+    "Send messages": "Nachrichten senden",
+    "notify_help": "Textnachricht, wenn ein Raum während des Urlaubs von Hand verstellt wird",
+    "Telegram instance": "Telegram-Instanz",
+    "Receivers": "Empfänger",
+    "notify_users_help": "Telegram-Benutzernamen, durch Kommas getrennt. Leer: alle Benutzer der Instanz."
 }

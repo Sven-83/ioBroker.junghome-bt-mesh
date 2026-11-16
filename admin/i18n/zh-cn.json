@@ -15,5 +15,16 @@
     "Poll interval (minutes)": "轮询间隔（分钟）",
     "poll_help": "恒温器会自行报告设定值变化；轮询还会读取室温",
     "Boost duration (minutes)": "增强时长（分钟）",
-    "Boost setpoint (°C)": "增强设定值（°C）"
+    "Boost setpoint (°C)": "增强设定值（°C）",
+    "Vacation setback": "假期降温",
+    "vacation_info": "通过 vacation.active 开启。所有已连接的温控器切换到假期设定温度；在 vacation.returnAt 之前指定的小时数恢复原设定温度。假期中手动修改视为有意：该房间退出降温并发送消息。",
+    "Vacation setpoint (°C)": "假期设定温度 (°C)",
+    "Pre-heating before the return (hours)": "返回前预热（小时）",
+    "preheat_help": "地暖反应慢：在返回前这段时间恢复原设定温度",
+    "Messages": "消息",
+    "Send messages": "发送消息",
+    "notify_help": "假期中房间被手动修改时发送文字消息",
+    "Telegram instance": "Telegram 实例",
+    "Receivers": "接收者",
+    "notify_users_help": "Telegram 用户名，用逗号分隔。为空：实例的所有用户。"
 }

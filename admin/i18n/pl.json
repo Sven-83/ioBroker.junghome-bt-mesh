@@ -15,5 +15,16 @@
     "Poll interval (minutes)": "Interwał odpytywania (minuty)",
     "poll_help": "Termostat sam zgłasza zmiany nastawy; odpytywanie pobiera też temperaturę w pomieszczeniu",
     "Boost duration (minutes)": "Czas trwania boostu (minuty)",
-    "Boost setpoint (°C)": "Nastawa boostu (°C)"
+    "Boost setpoint (°C)": "Nastawa boostu (°C)",
+    "Vacation setback": "Obniżenie na urlop",
+    "vacation_info": "Włączanie przez vacation.active. Wszystkie podłączone termostaty przechodzą na temperaturę urlopową; poprzednie wartości wracają podaną liczbę godzin przed vacation.returnAt. Ręczna zmiana podczas urlopu jest traktowana jako zamierzona: pomieszczenie wychodzi z obniżenia i wysyłana jest wiadomość.",
+    "Vacation setpoint (°C)": "Temperatura urlopowa (°C)",
+    "Pre-heating before the return (hours)": "Wstępne grzanie przed powrotem (godziny)",
+    "preheat_help": "Ogrzewanie podłogowe jest bezwładne: poprzednie wartości wracają tyle czasu przed powrotem",
+    "Messages": "Wiadomości",
+    "Send messages": "Wysyłaj wiadomości",
+    "notify_help": "Wiadomość tekstowa, gdy pomieszczenie zostanie zmienione ręcznie podczas urlopu",
+    "Telegram instance": "Instancja Telegram",
+    "Receivers": "Odbiorcy",
+    "notify_users_help": "Nazwy użytkowników Telegram oddzielone przecinkami. Puste: wszyscy użytkownicy instancji."
 }
