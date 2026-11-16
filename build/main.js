@@ -1070,8 +1070,8 @@ class JunghomeBtMesh extends utils.Adapter {
           const parsed = cmd.returnAt ? (0, import_vacation.parseReturnAt)(cmd.returnAt, Date.now()) : { ok: true, at: 0 };
           if (!parsed.ok) {
             return this.t(
-              `\u26A0\uFE0F Datum nicht verstanden. Beispiele: \u201EUrlaub bis 24.12.\u201C, \u201EUrlaub bis 24.12. 18:00\u201C, \u201EUrlaub\u201C (ohne Ende).`,
-              `\u26A0\uFE0F Date not understood. Examples: "vacation until 24.12.", "vacation until 24.12. 18:00", "vacation" (no end).`
+              `\u26A0\uFE0F Datum nicht verstanden. Beispiele: \u201EUrlaub bis 24.12.\u201C, \u201EUrlaub bis 24.12. 18:00\u201C, \u201EUrlaub bis Sonntag 18 Uhr\u201C, \u201EUrlaub bis morgen\u201C, \u201EUrlaub\u201C (ohne Ende).`,
+              `\u26A0\uFE0F Date not understood. Examples: "vacation until 24.12.", "vacation until 24.12. 18:00", "vacation until sunday 18:00", "vacation until tomorrow", "vacation" (no end).`
             );
           }
           if (this.vacation) {

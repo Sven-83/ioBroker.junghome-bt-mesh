@@ -23,6 +23,7 @@ __export(vacation_exports, {
   leaveSetback: () => leaveSetback,
   manualChangeText: () => manualChangeText,
   parseReturnAt: () => parseReturnAt,
+  parseSpokenDate: () => parseSpokenDate,
   parseVacation: () => parseVacation,
   parseVacationCommand: () => parseVacationCommand,
   planSetback: () => planSetback,
@@ -52,24 +53,14 @@ function parseReturnAt(value, now) {
     at = value;
   } else if (typeof value === "string") {
     const s = value.trim();
-    let m;
-    if (m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s)) {
+    const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+    if (m) {
       at = localDate(+m[1], +m[2], +m[3]);
-    } else if (m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})?(?:,?\s+(\d{1,2})(?::(\d{2}))?(?:\s*uhr)?)?$/i.exec(s)) {
-      const [d, mo, h, mi] = [+m[1], +m[2], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0];
-      if (m[3]) {
-        at = localDate(+m[3], mo, d, h, mi);
-      } else {
-        const year = new Date(now).getFullYear();
-        at = localDate(year, mo, d, h, mi);
-        if (Number.isFinite(at) && at <= now) {
-          at = localDate(year + 1, mo, d, h, mi);
-        }
-      }
-    } else if (/^\d+$/.test(s)) {
+    } else if (/^\d{9,}$/.test(s)) {
       at = Number(s);
     } else {
-      at = Date.parse(s);
+      const spoken = parseSpokenDate(s, now);
+      at = spoken != null ? spoken : Date.parse(s);
     }
   }
   if (!Number.isFinite(at)) {
@@ -85,6 +76,101 @@ function parseReturnAt(value, now) {
     return { ok: false, error: `the return date is more than ${MAX_VACATION_DAYS} days away` };
   }
   return { ok: true, at };
+}
+const WEEKDAYS = {
+  sonntag: 0,
+  montag: 1,
+  dienstag: 2,
+  mittwoch: 3,
+  donnerstag: 4,
+  freitag: 5,
+  samstag: 6,
+  sonnabend: 6,
+  so: 0,
+  mo: 1,
+  di: 2,
+  mi: 3,
+  do: 4,
+  fr: 5,
+  sa: 6,
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6
+};
+const RELATIVE_DAYS = { heute: 0, today: 0, morgen: 1, tomorrow: 1, \u00FCbermorgen: 2 };
+function parseSpokenDate(text, now) {
+  var _a;
+  const tokens = text.toLowerCase().replace(/,/g, " ").replace(/\b(um|am|den|zum|at|on)\b/g, " ").replace(/(\d)\s*uhr\b/g, "$1h").trim().split(/\s+/).filter(Boolean);
+  if (!tokens.length || tokens.length > 2) {
+    return null;
+  }
+  const today = new Date(now);
+  const clock = (t) => {
+    const m = /^(\d{1,2})(?:[:.](\d{2}))?h?$/.exec(t);
+    if (!m || !m[2] && !t.endsWith("h") && tokens.length === 1) {
+      return null;
+    }
+    const h = +m[1];
+    const mi = m[2] ? +m[2] : 0;
+    return h <= 23 && mi <= 59 ? [h, mi] : null;
+  };
+  const day = (t) => {
+    if (t in RELATIVE_DAYS) {
+      const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + RELATIVE_DAYS[t]);
+      return { y: d.getFullYear(), mo: d.getMonth() + 1, d: d.getDate(), fixed: true };
+    }
+    if (t in WEEKDAYS) {
+      return "weekday";
+    }
+    const m = /^(\d{1,2})\.(\d{1,2})\.?(\d{2}|\d{4})?$/.exec(t);
+    if (!m) {
+      return null;
+    }
+    const y = m[3] ? m[3].length === 2 ? 2e3 + +m[3] : +m[3] : today.getFullYear();
+    return { y, mo: +m[2], d: +m[1], fixed: !!m[3] };
+  };
+  const timeAlone = (t) => {
+    const c2 = clock(t);
+    if (!c2) {
+      return null;
+    }
+    const at2 = localDate(today.getFullYear(), today.getMonth() + 1, today.getDate(), c2[0], c2[1]);
+    return at2 > now ? at2 : new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, c2[0], c2[1]).getTime();
+  };
+  const dayTok = tokens[0];
+  const timeTok = tokens[1];
+  const dayPart = day(dayTok);
+  if (!dayPart && tokens.length === 1) {
+    return timeAlone(dayTok);
+  }
+  if (!dayPart) {
+    return null;
+  }
+  const time = timeTok === void 0 ? [0, 0] : clock(timeTok);
+  if (!time) {
+    return timeTok !== void 0 && /^\d/.test(timeTok) ? NaN : null;
+  }
+  if (dayPart === "weekday") {
+    const wd = WEEKDAYS[dayTok];
+    let diff = (wd - today.getDay() + 7) % 7;
+    const candidate = () => localDate(today.getFullYear(), today.getMonth() + 1, today.getDate() + diff, time[0], time[1]);
+    if (diff === 0 && (timeTok === void 0 || candidate() <= now)) {
+      diff = 7;
+    }
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate() + diff, time[0], time[1]).getTime();
+  }
+  let at = localDate(dayPart.y, dayPart.mo, dayPart.d, time[0], time[1]);
+  if (!Number.isFinite(at) && tokens.length === 1) {
+    return (_a = timeAlone(dayTok)) != null ? _a : NaN;
+  }
+  if (!dayPart.fixed && Number.isFinite(at) && at <= now) {
+    at = localDate(dayPart.y + 1, dayPart.mo, dayPart.d, time[0], time[1]);
+  }
+  return at;
 }
 function localDate(y, mo, d, h = 0, mi = 0) {
   if (h > 23 || mi > 59) {
@@ -232,6 +318,7 @@ function rejoinText(german, room, target, previous) {
   leaveSetback,
   manualChangeText,
   parseReturnAt,
+  parseSpokenDate,
   parseVacation,
   parseVacationCommand,
   planSetback,

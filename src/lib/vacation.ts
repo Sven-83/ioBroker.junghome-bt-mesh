@@ -56,25 +56,14 @@ export function parseReturnAt(value: unknown, now: number): { ok: true; at: numb
         at = value;
     } else if (typeof value === 'string') {
         const s = value.trim();
-        let m: RegExpExecArray | null;
-        if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s))) {
+        const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+        if (m) {
             at = localDate(+m[1], +m[2], +m[3]);
-        } else if ((m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})?(?:,?\s+(\d{1,2})(?::(\d{2}))?(?:\s*uhr)?)?$/i.exec(s))) {
-            // German style, also "24.12." (next 24.12.) and "24.12. 18:00"
-            const [d, mo, h, mi] = [+m[1], +m[2], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0];
-            if (m[3]) {
-                at = localDate(+m[3], mo, d, h, mi);
-            } else {
-                const year = new Date(now).getFullYear();
-                at = localDate(year, mo, d, h, mi);
-                if (Number.isFinite(at) && at <= now) {
-                    at = localDate(year + 1, mo, d, h, mi);
-                }
-            }
-        } else if (/^\d+$/.test(s)) {
+        } else if (/^\d{9,}$/.test(s)) {
             at = Number(s);
         } else {
-            at = Date.parse(s);
+            const spoken = parseSpokenDate(s, now);
+            at = spoken ?? Date.parse(s);
         }
     }
     if (!Number.isFinite(at)) {
@@ -90,6 +79,125 @@ export function parseReturnAt(value: unknown, now: number): { ok: true; at: numb
         return { ok: false, error: `the return date is more than ${MAX_VACATION_DAYS} days away` };
     }
     return { ok: true, at };
+}
+
+const WEEKDAYS: Record<string, number> = {
+    sonntag: 0,
+    montag: 1,
+    dienstag: 2,
+    mittwoch: 3,
+    donnerstag: 4,
+    freitag: 5,
+    samstag: 6,
+    sonnabend: 6,
+    so: 0,
+    mo: 1,
+    di: 2,
+    mi: 3,
+    do: 4,
+    fr: 5,
+    sa: 6,
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+};
+
+const RELATIVE_DAYS: Record<string, number> = { heute: 0, today: 0, morgen: 1, tomorrow: 1, übermorgen: 2 };
+
+/**
+ * Reads a date as people type it into a messenger: "24.12.", "24.12", "24.12.26", "24.12.2026",
+ * "morgen", "übermorgen", "Sonntag", each optionally followed by a time ("18", "18:00", "18.30", "18 Uhr"),
+ * or a time alone ("18:00" = today, tomorrow when already past). A date without time means 00:00.
+ * Returns null when the text does not look like such a date, NaN for an impossible date.
+ *
+ * @param text Typed text
+ * @param now Current time
+ */
+export function parseSpokenDate(text: string, now: number): number | null {
+    const tokens = text
+        .toLowerCase()
+        .replace(/,/g, ' ')
+        .replace(/\b(um|am|den|zum|at|on)\b/g, ' ')
+        .replace(/(\d)\s*uhr\b/g, '$1h')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    if (!tokens.length || tokens.length > 2) {
+        return null;
+    }
+    const today = new Date(now);
+    const clock = (t: string): [number, number] | null => {
+        const m = /^(\d{1,2})(?:[:.](\d{2}))?h?$/.exec(t);
+        if (!m || (!m[2] && !t.endsWith('h') && tokens.length === 1)) {
+            return null; // a lone "18" is not a time; "18 Uhr" / "18:00" are
+        }
+        const h = +m[1];
+        const mi = m[2] ? +m[2] : 0;
+        return h <= 23 && mi <= 59 ? [h, mi] : null;
+    };
+    const day = (t: string): { y: number; mo: number; d: number; fixed: boolean } | 'weekday' | null => {
+        if (t in RELATIVE_DAYS) {
+            const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + RELATIVE_DAYS[t]);
+            return { y: d.getFullYear(), mo: d.getMonth() + 1, d: d.getDate(), fixed: true };
+        }
+        if (t in WEEKDAYS) {
+            return 'weekday';
+        }
+        const m = /^(\d{1,2})\.(\d{1,2})\.?(\d{2}|\d{4})?$/.exec(t);
+        if (!m) {
+            return null;
+        }
+        const y = m[3] ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : today.getFullYear();
+        return { y, mo: +m[2], d: +m[1], fixed: !!m[3] };
+    };
+
+    const timeAlone = (t: string): number | null => {
+        const c = clock(t);
+        if (!c) {
+            return null;
+        }
+        const at = localDate(today.getFullYear(), today.getMonth() + 1, today.getDate(), c[0], c[1]);
+        return at > now
+            ? at
+            : new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, c[0], c[1]).getTime();
+    };
+    const dayTok = tokens[0];
+    const timeTok: string | undefined = tokens[1];
+    const dayPart = day(dayTok);
+    if (!dayPart && tokens.length === 1) {
+        return timeAlone(dayTok);
+    }
+    if (!dayPart) {
+        return null;
+    }
+    const time: [number, number] | null = timeTok === undefined ? [0, 0] : clock(timeTok);
+    if (!time) {
+        return timeTok !== undefined && /^\d/.test(timeTok) ? NaN : null;
+    }
+    if (dayPart === 'weekday') {
+        const wd = WEEKDAYS[dayTok];
+        let diff = (wd - today.getDay() + 7) % 7;
+        const candidate = (): number =>
+            localDate(today.getFullYear(), today.getMonth() + 1, today.getDate() + diff, time[0], time[1]);
+        if (diff === 0 && (timeTok === undefined || candidate() <= now)) {
+            diff = 7;
+        }
+        // let Date roll the day over month ends
+        return new Date(today.getFullYear(), today.getMonth(), today.getDate() + diff, time[0], time[1]).getTime();
+    }
+    let at = localDate(dayPart.y, dayPart.mo, dayPart.d, time[0], time[1]);
+    if (!Number.isFinite(at) && tokens.length === 1) {
+        // "18.30" is no date, but a time
+        return timeAlone(dayTok) ?? NaN;
+    }
+    if (!dayPart.fixed && Number.isFinite(at) && at <= now) {
+        at = localDate(dayPart.y + 1, dayPart.mo, dayPart.d, time[0], time[1]);
+    }
+    return at;
 }
 
 function localDate(y: number, mo: number, d: number, h = 0, mi = 0): number {

@@ -1144,8 +1144,8 @@ class JunghomeBtMesh extends utils.Adapter {
                         : { ok: true as const, at: 0 };
                     if (!parsed.ok) {
                         return this.t(
-                            `⚠️ Datum nicht verstanden. Beispiele: „Urlaub bis 24.12.“, „Urlaub bis 24.12. 18:00“, „Urlaub“ (ohne Ende).`,
-                            `⚠️ Date not understood. Examples: "vacation until 24.12.", "vacation until 24.12. 18:00", "vacation" (no end).`,
+                            `⚠️ Datum nicht verstanden. Beispiele: „Urlaub bis 24.12.“, „Urlaub bis 24.12. 18:00“, „Urlaub bis Sonntag 18 Uhr“, „Urlaub bis morgen“, „Urlaub“ (ohne Ende).`,
+                            `⚠️ Date not understood. Examples: "vacation until 24.12.", "vacation until 24.12. 18:00", "vacation until sunday 18:00", "vacation until tomorrow", "vacation" (no end).`,
                         );
                     }
                     if (this.vacation) {

@@ -78,7 +78,8 @@ With messages switched on, the adapter also reads commands sent to the bot (only
 | `Urlaub aus` | End now, previous setpoints come back |
 | `Urlaub Status` / `Urlaub?` | Current state |
 
-English works too (`vacation`, `vacation until 24.12.`, `vacation off`, `vacation status`).
+Dates are read the way people type them: `24.12`, `24.12.26`, `24.12. 18.30`, `18 Uhr` (today, tomorrow when already past), `morgen`, `übermorgen`, weekdays (`Sonntag 18 Uhr`, `Fr`). A date without time means 00:00.
+English works too (`vacation`, `vacation until 24.12.`, `vacation until tomorrow`, `vacation off`, `vacation status`).
 The message about a room changed by hand carries a button **Back to the vacation setback**: the room goes back to the vacation setpoint and at the end returns to its setpoint from before the vacation.
 
 Rooms already at or below the vacation setpoint stay as they are. A running boost ends when the setback starts; a boost started during the vacation returns to the vacation setpoint.
@@ -107,6 +108,7 @@ JUNG and JUNG HOME are trademarks of ALBRECHT JUNG GMBH & CO. KG; this project i
 
 - (Sven-83) vacation setback with pre-heating before the return and a Telegram message when a room is changed by hand during the vacation
 - (Sven-83) Telegram commands for the vacation setback and a button to bring a room back into it; `vacation` state per thermostat
+- (Sven-83) dates in Telegram commands: without dots or year, short year, time alone, tomorrow, weekdays
 - (Sven-83) shutdown no longer waits for timers the adapter refuses while stopping
 
 ### 0.0.1 (2026-11-15)

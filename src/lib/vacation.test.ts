@@ -9,6 +9,7 @@ import {
     rejoinText,
     statusText,
     parseReturnAt,
+    parseSpokenDate,
     parseVacation,
     planSetback,
     preheatFrom,
@@ -173,5 +174,37 @@ describe('vacation', () => {
         expect(rejoinText(true, 'Raum A', 17, 21))
             .to.include('17,0 °C')
             .and.include('21,0 °C');
+    });
+    it('reads dates the way people type them into Telegram', () => {
+        // NOW is Monday 16.11.2026 12:00
+        const d = (y: number, mo: number, day: number, h = 0, mi = 0): number =>
+            new Date(y, mo - 1, day, h, mi).getTime();
+        const cases: Array<[string, number]> = [
+            ['16.11 18:30', d(2026, 11, 16, 18, 30)],
+            ['16.11. 18.30', d(2026, 11, 16, 18, 30)],
+            ['24.12.26', d(2026, 12, 24)],
+            ['24.12.26 18 Uhr', d(2026, 12, 24, 18)],
+            ['zum 24.12. um 18 Uhr', d(2026, 12, 24, 18)],
+            ['18:00', d(2026, 11, 16, 18)],
+            ['18 Uhr', d(2026, 11, 16, 18)],
+            ['18.30', d(2026, 11, 16, 18, 30)],
+            ['9:00', d(2026, 11, 17, 9)], // already past today: tomorrow
+            ['morgen', d(2026, 11, 17)],
+            ['Morgen 18 Uhr', d(2026, 11, 17, 18)],
+            ['übermorgen 7:30', d(2026, 11, 18, 7, 30)],
+            ['Sonntag', d(2026, 11, 22)],
+            ['Sonntag 18 Uhr', d(2026, 11, 22, 18)],
+            ['Montag', d(2026, 11, 23)], // today is Monday: next week
+            ['Montag 18:00', d(2026, 11, 16, 18)], // later today
+            ['Fr 12:00', d(2026, 11, 20, 12)],
+            ['Saturday 10:00', d(2026, 11, 21, 10)],
+        ];
+        for (const [text, at] of cases) {
+            expect(parseReturnAt(text, NOW), text).to.deep.equal({ ok: true, at });
+        }
+        expect(parseSpokenDate('irgendwann', NOW)).to.equal(null);
+        expect(parseSpokenDate('24.12. 25:00', NOW)).to.be.NaN;
+        expect(parseSpokenDate('31.02.', NOW)).to.be.NaN;
+        expect(parseReturnAt('heute', NOW).ok).to.equal(false); // 00:00 today is past
     });
 });
