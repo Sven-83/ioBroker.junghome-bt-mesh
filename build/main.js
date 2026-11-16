@@ -31,6 +31,7 @@ var import_mesh_export = require("./lib/mesh-export");
 var import_mesh_link = require("./lib/mesh-link");
 var import_seq = require("./lib/seq");
 var import_thermostat = require("./lib/thermostat");
+var import_telegram = require("./lib/telegram");
 var import_vacation = require("./lib/vacation");
 const CONFIRM_TIMEOUT_MS = 4e3;
 const MESSAGE_GAP_MS = 300;
@@ -47,6 +48,7 @@ class JunghomeBtMesh extends utils.Adapter {
   vacation = null;
   vacationTimer;
   vacationBusy = false;
+  telegramRequestId = "";
   german = true;
   constructor(options = {}) {
     super({ ...options, name: "junghome-bt-mesh" });
@@ -114,6 +116,10 @@ class JunghomeBtMesh extends utils.Adapter {
     await this.createVacationObjects();
     this.subscribeStates("thermostats.*");
     this.subscribeStates("vacation.*");
+    if (config.notifyInstance) {
+      this.telegramRequestId = `${config.notifyInstance}.communicate.request`;
+      await this.subscribeForeignStatesAsync(this.telegramRequestId);
+    }
     this.link = new import_mesh_link.MeshLink(
       config.proxies,
       exp.thermostats.map((t) => t.mac),
@@ -125,8 +131,16 @@ class JunghomeBtMesh extends utils.Adapter {
         reconnect: false
       }),
       {
-        setTimeout: (cb, ms) => this.setTimeout(cb, ms),
-        clearTimeout: (h) => this.clearTimeout(h),
+        // the adapter refuses timers while it shuts down; the short, bounded timeouts of the
+        // GATT disconnect then use a plain timer so the shutdown never waits forever
+        setTimeout: (cb, ms) => this.unloading ? { shutdownTimer: setTimeout(cb, Math.min(ms, 3e3)) } : this.setTimeout(cb, ms),
+        clearTimeout: (h) => {
+          if (h && typeof h === "object" && "shutdownTimer" in h) {
+            clearTimeout(h.shutdownTimer);
+          } else {
+            this.clearTimeout(h);
+          }
+        },
         now: () => Date.now()
       },
       this.log
@@ -231,6 +245,17 @@ class JunghomeBtMesh extends utils.Adapter {
       ],
       ["mode", { name: "Operating mode (JUNG)", type: "number", role: "value", read: true, write: false }],
       ["boost", { name: "Boost", type: "boolean", role: "switch.boost", read: true, write: true, def: false }],
+      [
+        "vacation",
+        {
+          name: "In the vacation setback (true = rejoin, false = leave)",
+          type: "boolean",
+          role: "switch",
+          read: true,
+          write: true,
+          def: false
+        }
+      ],
       [
         "boostUntil",
         { name: "Boost ends at", type: "number", role: "value.time", read: true, write: false, def: 0 }
@@ -645,6 +670,9 @@ class JunghomeBtMesh extends utils.Adapter {
     await this.setState(`${room.id}.boostUntil`, { val: 0, ack: true });
   }
   // ---------- vacation ----------
+  t(de, en) {
+    return this.german ? de : en;
+  }
   async saveVacation() {
     const v = this.vacation;
     await this.setState("vacation.state", { val: v ? JSON.stringify(v) : "", ack: true });
@@ -654,6 +682,9 @@ class JunghomeBtMesh extends utils.Adapter {
     }
     await this.setState("vacation.preheatFrom", { val: v ? (0, import_vacation.preheatFrom)(v) : 0, ack: true });
     await this.setState("vacation.rooms", { val: v ? Object.keys(v.rooms).length : 0, ack: true });
+    for (const room of this.rooms.values()) {
+      await this.setState(`${room.id}.vacation`, { val: !!v && room.id in v.rooms, ack: true });
+    }
   }
   armVacationTimer() {
     if (this.vacationTimer) {
@@ -661,7 +692,7 @@ class JunghomeBtMesh extends utils.Adapter {
       this.vacationTimer = void 0;
     }
     const v = this.vacation;
-    if (!v || v.returnAt === 0) {
+    if (!v || v.returnAt === 0 || this.unloading) {
       return;
     }
     const ms = Math.min(Math.max(0, (0, import_vacation.preheatFrom)(v) - Date.now()), 2 ** 31 - 1);
@@ -674,23 +705,44 @@ class JunghomeBtMesh extends utils.Adapter {
       void this.endVacation("pre-heating before the return");
     }, ms);
   }
-  async onVacationCommand(id, value) {
+  /**
+   * Runs one vacation command at a time.
+   *
+   * @param job Command
+   */
+  async exclusive(job) {
     if (this.vacationBusy) {
       this.log.warn("Vacation setback: still busy with the last command, please try again");
-      await this.saveVacation();
-      return;
+      return void 0;
     }
     this.vacationBusy = true;
     try {
+      return await job();
+    } finally {
+      this.vacationBusy = false;
+    }
+  }
+  async onVacationCommand(id, value) {
+    const done = await this.exclusive(async () => {
+      var _a;
       if (id === "vacation.returnAt") {
         await this.onReturnAtCommand(value);
       } else if (value === true || value === "true" || value === 1) {
-        await this.beginVacation();
+        const ret = await this.getStateAsync("vacation.returnAt");
+        const parsed = (0, import_vacation.parseReturnAt)((_a = ret == null ? void 0 : ret.val) != null ? _a : 0, Date.now());
+        if (!parsed.ok) {
+          this.log.warn(`Vacation setback not started: ${parsed.error}`);
+          await this.setState("vacation.active", { val: false, ack: true });
+        } else {
+          await this.beginVacation(parsed.at);
+        }
       } else {
         await this.endVacation("switched off");
       }
-    } finally {
-      this.vacationBusy = false;
+      return true;
+    });
+    if (!done) {
+      await this.saveVacation();
     }
   }
   async onReturnAtCommand(value) {
@@ -702,11 +754,11 @@ class JunghomeBtMesh extends utils.Adapter {
         val: this.vacation ? this.vacation.returnAt : typeof (old == null ? void 0 : old.val) === "number" ? old.val : 0,
         ack: true
       });
-      return;
+      return r.error;
     }
     if (!this.vacation) {
       await this.setState("vacation.returnAt", { val: r.at, ack: true });
-      return;
+      return null;
     }
     this.vacation.returnAt = r.at;
     this.log.info(`Vacation setback: return set to ${r.at ? new Date(r.at).toISOString() : "open end"}`);
@@ -716,30 +768,36 @@ class JunghomeBtMesh extends utils.Adapter {
     } else {
       this.armVacationTimer();
     }
+    return null;
   }
-  async beginVacation() {
-    var _a, _b;
+  /**
+   * Starts the setback. Returns a reason (German/English for Telegram) when it was not started.
+   *
+   * @param returnAt Return (ms), 0 = open end
+   */
+  async beginVacation(returnAt) {
+    var _a;
     if (this.vacation) {
       await this.saveVacation();
-      return;
+      return null;
     }
     const cfg = this.cfg;
-    const refuse = async (why) => {
+    const refuse = async (why, de) => {
       this.log.warn(`Vacation setback not started: ${why}`);
       await this.setState("vacation.active", { val: false, ack: true });
+      return this.t(de, why);
     };
     if (!((_a = this.link) == null ? void 0 : _a.ready)) {
-      return refuse("not connected to the mesh");
+      return refuse("not connected to the mesh", "keine Verbindung zu den Thermostaten");
     }
-    const ret = await this.getStateAsync("vacation.returnAt");
-    const parsed = (0, import_vacation.parseReturnAt)((_b = ret == null ? void 0 : ret.val) != null ? _b : 0, Date.now());
-    if (!parsed.ok) {
-      return refuse(parsed.error);
-    }
-    const draft = { returnAt: parsed.at, preheatHours: cfg.vacationPreheatHours };
+    const draft = { returnAt, preheatHours: cfg.vacationPreheatHours };
     if ((0, import_vacation.vacationDue)(draft, Date.now())) {
-      return refuse(`the return is less than ${cfg.vacationPreheatHours} h away`);
+      return refuse(
+        `the return is less than ${cfg.vacationPreheatHours} h away`,
+        `die R\xFCckkehr ist weniger als ${cfg.vacationPreheatHours} h entfernt`
+      );
     }
+    await this.setState("vacation.returnAt", { val: returnAt, ack: true });
     const rooms = [...this.rooms.values()];
     const plan = (0, import_vacation.planSetback)(
       rooms.map((r) => ({ id: r.id, setpoint: r.boost ? r.boost.previous : r.setpoint })),
@@ -751,7 +809,12 @@ class JunghomeBtMesh extends utils.Adapter {
     for (const id of plan.alreadyLow) {
       this.log.info(`Vacation setback: ${this.nameOf(id)} is already at or below ${cfg.vacationSetpoint} \xB0C`);
     }
-    const vacation = { ...draft, target: cfg.vacationSetpoint, rooms: { ...plan.lower } };
+    const vacation = {
+      ...draft,
+      target: cfg.vacationSetpoint,
+      rooms: { ...plan.lower },
+      left: {}
+    };
     this.vacation = vacation;
     await this.saveVacation();
     let failed = 0;
@@ -772,8 +835,7 @@ class JunghomeBtMesh extends utils.Adapter {
     if (failed && !lowered) {
       this.vacation = null;
       await this.saveVacation();
-      this.log.warn("Vacation setback not started: no thermostat accepted the setpoint");
-      return;
+      return refuse("no thermostat accepted the setpoint", "kein Thermostat hat den Sollwert angenommen");
     }
     await this.saveVacation();
     this.armVacationTimer();
@@ -781,6 +843,7 @@ class JunghomeBtMesh extends utils.Adapter {
     this.log.info(
       `Vacation setback on: ${lowered} thermostat(s) at ${cfg.vacationSetpoint} \xB0C${failed ? `, ${failed} failed` : ""}${until}`
     );
+    return null;
   }
   async endVacation(why) {
     var _a;
@@ -795,7 +858,7 @@ class JunghomeBtMesh extends utils.Adapter {
     }
     if (!((_a = this.link) == null ? void 0 : _a.ready)) {
       this.log.warn(`Vacation setback ends (${why}) as soon as the mesh is connected again`);
-      if (why === "switched off") {
+      if (why.startsWith("switched off")) {
         v.returnAt = Date.now();
         v.preheatHours = 0;
       }
@@ -820,13 +883,15 @@ class JunghomeBtMesh extends utils.Adapter {
     if (left) {
       this.log.warn(`Vacation setback: ${left} setpoint(s) could not be restored, retry in 1 min`);
       await this.saveVacation();
-      this.vacationTimer = this.setTimeout(() => void this.endVacation(why), 6e4);
+      if (!this.unloading) {
+        this.vacationTimer = this.setTimeout(() => void this.endVacation(why), 6e4);
+      }
       return;
     }
     this.vacation = null;
     await this.saveVacation();
     await this.setState("vacation.returnAt", { val: 0, ack: true });
-    this.log.info(`Vacation setback ended (${why}), previous setpoints restored`);
+    this.log.info(`Vacation setback ended (${why})`);
   }
   /**
    * A lowered room was changed by hand: the change counts as intended, the room leaves the setback.
@@ -836,26 +901,102 @@ class JunghomeBtMesh extends utils.Adapter {
    * @param atDevice Changed at the thermostat (true) or through ioBroker (false)
    */
   async leaveVacation(room, celsius, atDevice) {
-    if (!this.vacation || !(room.id in this.vacation.rooms)) {
+    if (!this.vacation || !(0, import_vacation.leaveSetback)(this.vacation, room.id)) {
       return;
     }
-    delete this.vacation.rooms[room.id];
     await this.saveVacation();
     this.log.info(
       `${room.info.name}: setpoint ${celsius} \xB0C set by hand during the vacation, the room leaves the setback`
     );
-    void this.notify((0, import_vacation.manualChangeText)(this.german, room.info.name, celsius, atDevice));
+    void this.notify((0, import_vacation.manualChangeText)(this.german, room.info.name, celsius, atDevice), {
+      label: (0, import_vacation.rejoinButton)(this.german),
+      data: `${import_vacation.REJOIN_PREFIX}${room.id.slice(-4)}`
+    });
+  }
+  /**
+   * Puts a room back into the running setback. Returns the answer for Telegram.
+   *
+   * @param room Thermostat
+   */
+  async rejoinVacation(room) {
+    var _a;
+    const v = this.vacation;
+    const name = room.info.name;
+    if (!v) {
+      return this.t("\u{1F3E0} Der Urlaub ist schon vorbei.", "\u{1F3E0} The vacation is already over.");
+    }
+    if (room.id in v.rooms) {
+      return this.t(
+        `${name} ist bereits in der Urlaubsabsenkung.`,
+        `${name} is already in the vacation setback.`
+      );
+    }
+    const previous = (0, import_vacation.rejoinPrevious)(v, room.id, room.boost ? room.boost.previous : room.setpoint);
+    if (previous === null) {
+      return this.t(
+        `${name}: kein Sollwert \xFCber ${v.target} \xB0C bekannt, nichts abzusenken.`,
+        `${name}: no setpoint above ${v.target} \xB0C known, nothing to lower.`
+      );
+    }
+    if (!((_a = this.link) == null ? void 0 : _a.ready)) {
+      return this.t(
+        `\u26A0\uFE0F ${name}: keine Verbindung zum Thermostat, bitte sp\xE4ter noch einmal.`,
+        `\u26A0\uFE0F ${name}: no connection to the thermostat, please try again later.`
+      );
+    }
+    v.rooms[room.id] = previous;
+    delete v.left[room.id];
+    await this.saveVacation();
+    if (room.boost) {
+      await this.clearBoost(room);
+    }
+    if (!await this.writeSetpoint(room, v.target)) {
+      if (this.vacation === v) {
+        delete v.rooms[room.id];
+        v.left[room.id] = previous;
+        await this.saveVacation();
+      }
+      return this.t(
+        `\u26A0\uFE0F ${name}: Das Thermostat hat ${v.target} \xB0C nicht best\xE4tigt.`,
+        `\u26A0\uFE0F ${name}: the thermostat did not confirm ${v.target} \xB0C.`
+      );
+    }
+    this.log.info(`${name}: back in the vacation setback, ${previous} \xB0C comes back at the end`);
+    return (0, import_vacation.rejoinText)(this.german, name, v.target, previous);
+  }
+  /**
+   * Takes a room out of the setback through its vacation state and restores its previous setpoint.
+   *
+   * @param room Thermostat
+   */
+  async leaveByCommand(room) {
+    const v = this.vacation;
+    if (!v || !(room.id in v.rooms)) {
+      await this.setState(`${room.id}.vacation`, { val: false, ack: true });
+      return;
+    }
+    const previous = v.rooms[room.id];
+    if (!await this.writeSetpoint(room, previous)) {
+      await this.saveVacation();
+      return;
+    }
+    (0, import_vacation.leaveSetback)(v, room.id);
+    await this.saveVacation();
+    this.log.info(`${room.info.name}: taken out of the vacation setback, back to ${previous} \xB0C`);
   }
   nameOf(id) {
     var _a, _b;
     return (_b = (_a = [...this.rooms.values()].find((r) => r.id === id)) == null ? void 0 : _a.info.name) != null ? _b : id;
   }
   /**
-   * Sends a text through the messenger instance (Telegram). Failures are only logged.
+   * Sends a text through the messenger instance (Telegram) to the configured receivers. Failures are only logged.
    *
    * @param text Message
+   * @param button Optional inline button
+   * @param button.label Label of the button
+   * @param button.data Callback data
    */
-  async notify(text) {
+  async notify(text, button) {
     const cfg = this.cfg;
     if (!(cfg == null ? void 0 : cfg.notifyInstance)) {
       return;
@@ -863,13 +1004,95 @@ class JunghomeBtMesh extends utils.Adapter {
     const users = cfg.notifyUsers.length ? cfg.notifyUsers : [""];
     for (const user of users) {
       try {
-        await this.sendToAsync(cfg.notifyInstance, "send", user ? { text, user } : { text }, {
+        await this.sendToAsync(cfg.notifyInstance, "send", (0, import_telegram.telegramPayload)(text, { user }, button), {
           timeout: NOTIFY_TIMEOUT_MS
         });
       } catch (e) {
         this.log.warn(`Message via ${cfg.notifyInstance} not sent: ${e.message}`);
       }
     }
+  }
+  /**
+   * A text or button press arrived at the telegram instance. Only vacation commands of known users are handled.
+   *
+   * @param request Value of telegram.N.communicate.request
+   */
+  async onTelegramRequest(request) {
+    var _a, _b, _c;
+    const cmd = (0, import_vacation.parseVacationCommand)(request);
+    const instance = (_a = this.cfg) == null ? void 0 : _a.notifyInstance;
+    if (!cmd || !instance) {
+      return;
+    }
+    const chatId = (_b = await this.getForeignStateAsync(`${instance}.communicate.requestChatId`)) == null ? void 0 : _b.val;
+    const users = (0, import_telegram.knownUsers)((_c = await this.getForeignStateAsync(`${instance}.communicate.users`)) == null ? void 0 : _c.val);
+    if (typeof chatId !== "number" && typeof chatId !== "string" || !users.has(String(chatId))) {
+      this.log.warn(
+        "Vacation setback: Telegram command from a chat the telegram instance does not know, ignored"
+      );
+      return;
+    }
+    const reply = async (text) => {
+      try {
+        await this.sendToAsync(instance, "send", (0, import_telegram.telegramPayload)(text, { chatId }), {
+          timeout: NOTIFY_TIMEOUT_MS
+        });
+      } catch (e) {
+        this.log.warn(`Answer via ${instance} not sent: ${e.message}`);
+      }
+    };
+    if (cmd.kind === "rejoin") {
+      void this.sendToAsync(
+        instance,
+        "send",
+        { text: "\u21A9\uFE0F", chatId, answerCallbackQuery: { text: "\u21A9\uFE0F", showAlert: false } },
+        { timeout: NOTIFY_TIMEOUT_MS }
+      ).catch(() => void 0);
+    }
+    const answer = await this.exclusive(async () => {
+      const status = () => (0, import_vacation.statusText)(this.vacation, this.german, (id) => this.nameOf(id));
+      switch (cmd.kind) {
+        case "status":
+          return status();
+        case "off":
+          if (!this.vacation) {
+            return status();
+          }
+          await this.endVacation("switched off via Telegram");
+          return this.vacation ? this.t(
+            "\u26A0\uFE0F Urlaubsabsenkung endet, sobald die Thermostate wieder erreichbar sind.",
+            "\u26A0\uFE0F The vacation setback ends as soon as the thermostats are reachable again."
+          ) : this.t(
+            "\u{1F3E0} Urlaubsabsenkung beendet, die vorherigen Sollwerte sind zur\xFCck.",
+            "\u{1F3E0} Vacation setback ended, the previous setpoints are back."
+          );
+        case "on": {
+          const parsed = cmd.returnAt ? (0, import_vacation.parseReturnAt)(cmd.returnAt, Date.now()) : { ok: true, at: 0 };
+          if (!parsed.ok) {
+            return this.t(
+              `\u26A0\uFE0F Datum nicht verstanden. Beispiele: \u201EUrlaub bis 24.12.\u201C, \u201EUrlaub bis 24.12. 18:00\u201C, \u201EUrlaub\u201C (ohne Ende).`,
+              `\u26A0\uFE0F Date not understood. Examples: "vacation until 24.12.", "vacation until 24.12. 18:00", "vacation" (no end).`
+            );
+          }
+          if (this.vacation) {
+            const error2 = await this.onReturnAtCommand(parsed.at);
+            return error2 ? `\u26A0\uFE0F ${error2}` : status();
+          }
+          const error = await this.beginVacation(parsed.at);
+          return error ? this.t(`\u26A0\uFE0F Nicht gestartet: ${error}`, `\u26A0\uFE0F Not started: ${error}`) : status();
+        }
+        case "rejoin": {
+          const room = this.rooms.get(parseInt(cmd.address, 16));
+          return room ? this.rejoinVacation(room) : this.t("Raum unbekannt.", "Unknown room.");
+        }
+      }
+    });
+    await reply(
+      answer != null ? answer : this.t(
+        "\u23F3 Ich bin noch mit dem letzten Befehl besch\xE4ftigt, bitte gleich noch einmal.",
+        "\u23F3 Still busy with the last command, please try again in a moment."
+      )
+    );
   }
   // ---------- state changes ----------
   async onStateChange(id, state) {
@@ -889,7 +1112,7 @@ class JunghomeBtMesh extends utils.Adapter {
         await this.onVacationCommand(local, state.val);
         return;
       }
-      const m = /^thermostats\.([0-9A-F]{4})\.(setpoint|boost|leadSensor)$/.exec(
+      const m = /^thermostats\.([0-9A-F]{4})\.(setpoint|boost|vacation|leadSensor)$/.exec(
         id.slice(this.namespace.length + 1)
       );
       const room = m ? this.rooms.get(parseInt(m[1], 16)) : void 0;
@@ -898,6 +1121,21 @@ class JunghomeBtMesh extends utils.Adapter {
       }
       if (m[2] === "setpoint") {
         await this.onSetpointCommand(room, state.val);
+      } else if (m[2] === "vacation") {
+        const on = state.val === true || state.val === "true" || state.val === 1;
+        const done = await this.exclusive(async () => {
+          if (on) {
+            const answer = await this.rejoinVacation(room);
+            this.log.info(`${room.info.name}: ${answer}`);
+            await this.saveVacation();
+          } else {
+            await this.leaveByCommand(room);
+          }
+          return true;
+        });
+        if (!done) {
+          await this.saveVacation();
+        }
       } else if (m[2] === "boost") {
         if (state.val === true || state.val === "true" || state.val === 1) {
           await this.beginBoost(room);
@@ -943,6 +1181,10 @@ class JunghomeBtMesh extends utils.Adapter {
     }
   }
   async onForeignState(id, state) {
+    if (id === this.telegramRequestId) {
+      await this.onTelegramRequest(state.val);
+      return;
+    }
     for (const room of this.rooms.values()) {
       if (room.leadSensor === id) {
         room.leadTemperature = typeof state.val === "number" && Number.isFinite(state.val) ? state.val : null;

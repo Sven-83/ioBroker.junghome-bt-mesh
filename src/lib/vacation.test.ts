@@ -1,7 +1,13 @@
 import { expect } from 'chai';
 import {
     MAX_VACATION_DAYS,
+    REJOIN_PREFIX,
+    leaveSetback,
     manualChangeText,
+    parseVacationCommand,
+    rejoinPrevious,
+    rejoinText,
+    statusText,
     parseReturnAt,
     parseVacation,
     planSetback,
@@ -19,6 +25,7 @@ const V: VacationState = {
     target: 17,
     preheatHours: 24,
     rooms: { 'thermostats.0006': 21 },
+    left: {},
 };
 
 describe('vacation', () => {
@@ -95,5 +102,76 @@ describe('vacation', () => {
         expect(de).to.include('Raum A').and.include('19,5 °C').and.include('am Thermostat');
         const en = manualChangeText(false, 'Room A', 20, false);
         expect(en).to.include('Room A').and.include('20.0 °C').and.include('through ioBroker');
+    });
+    it('reads short German dates for Telegram', () => {
+        expect(parseReturnAt('24.12.', NOW)).to.deep.equal({ ok: true, at: new Date(2026, 11, 24).getTime() });
+        expect(parseReturnAt('24.12. 18:00', NOW)).to.deep.equal({
+            ok: true,
+            at: new Date(2026, 11, 24, 18, 0).getTime(),
+        });
+        expect(parseReturnAt('24.12.2026, 18 Uhr', NOW)).to.deep.equal({
+            ok: true,
+            at: new Date(2026, 11, 24, 18, 0).getTime(),
+        });
+        // a day already passed this year means next year
+        expect(parseReturnAt('2.1.', NOW)).to.deep.equal({ ok: true, at: new Date(2027, 0, 2).getTime() });
+        expect(parseReturnAt('24.12. 25:00', NOW).ok).to.equal(false);
+    });
+
+    it('remembers the original setpoint of a room that left, for rejoining', () => {
+        const v: VacationState = { ...V, rooms: { a: 21 }, left: {} };
+        expect(leaveSetback(v, 'a')).to.equal(true);
+        expect(v.rooms).to.deep.equal({});
+        expect(v.left).to.deep.equal({ a: 21 });
+        expect(leaveSetback(v, 'a')).to.equal(false);
+        // rejoin brings back the setpoint from before the vacation, not the one set by hand
+        expect(rejoinPrevious(v, 'a', 17.5)).to.equal(21);
+        // a room that was never lowered uses its current setpoint
+        expect(rejoinPrevious(v, 'b', 22)).to.equal(22);
+        expect(rejoinPrevious(v, 'b', 16)).to.equal(null);
+        expect(rejoinPrevious(v, 'b', null)).to.equal(null);
+        expect(rejoinPrevious({ ...v, rooms: { b: 21 } }, 'b', 22)).to.equal(null);
+    });
+
+    it('reads older stored data without the list of rooms that left', () => {
+        const old = JSON.stringify({ returnAt: 1, target: 17, preheatHours: 0, rooms: { a: 21 } });
+        expect(parseVacation(old)?.left).to.deep.equal({});
+        expect(parseVacation(JSON.stringify({ ...V, left: { a: 'x' } }))).to.equal(null);
+    });
+
+    it('understands Telegram commands', () => {
+        expect(parseVacationCommand('[Sven]Urlaub')).to.deep.equal({ kind: 'on', returnAt: '' });
+        expect(parseVacationCommand('[Sven]urlaub an')).to.deep.equal({ kind: 'on', returnAt: '' });
+        expect(parseVacationCommand('[Sven]Urlaub bis 24.12.')).to.deep.equal({ kind: 'on', returnAt: '24.12.' });
+        expect(parseVacationCommand('[Sven]Urlaub 24.12. 18:00')).to.deep.equal({
+            kind: 'on',
+            returnAt: '24.12. 18:00',
+        });
+        expect(parseVacationCommand('[Sven]Urlaub aus')).to.deep.equal({ kind: 'off' });
+        expect(parseVacationCommand('[Sven]/urlaub status')).to.deep.equal({ kind: 'status' });
+        expect(parseVacationCommand('[Sven]Urlaub?')).to.deep.equal({ kind: 'status' });
+        expect(parseVacationCommand('[x]vacation off')).to.deep.equal({ kind: 'off' });
+        expect(parseVacationCommand(`[Sven]${REJOIN_PREFIX}0006`)).to.deep.equal({ kind: 'rejoin', address: '0006' });
+        expect(parseVacationCommand('[Sven]Laden 14 kWh')).to.equal(null);
+        expect(parseVacationCommand('[Sven]Urlaubsfotos')).to.equal(null);
+        expect(parseVacationCommand(42)).to.equal(null);
+    });
+
+    it('describes the state for Telegram', () => {
+        const name = (id: string): string => (id === 'a' ? 'Raum A' : 'Raum B');
+        expect(statusText(null, true, name)).to.include('aus');
+        const v: VacationState = {
+            ...V,
+            returnAt: new Date(2026, 11, 24).getTime(),
+            rooms: { a: 21 },
+            left: { b: 22 },
+        };
+        const de = statusText(v, true, name);
+        expect(de).to.include('17,0 °C').and.include('Rückkehr 24.12. 00:00').and.include('vorheizen ab 23.12. 00:00');
+        expect(de).to.include('Abgesenkt: Raum A').and.include('Von Hand verstellt: Raum B');
+        expect(statusText({ ...v, returnAt: 0 }, false, name)).to.include('No return date');
+        expect(rejoinText(true, 'Raum A', 17, 21))
+            .to.include('17,0 °C')
+            .and.include('21,0 °C');
     });
 });
